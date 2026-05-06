@@ -26,7 +26,8 @@
       "Bash(grep -aoE '\"[A-Za-z][^\"]{4,80}\"' /tmp/piniq.js)",
       "Bash(grep -aoE '\"[A-Za-z][^\"]{2,120}\"' /tmp/piniq.js)",
       "Bash(grep -aoE '\"[A-Za-z][^\"]{2,200}\"' /tmp/piniq.js)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/adherence)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/adherence)",
+      "Bash(node -e \"const {COMPOUNDS} = require\\('./data/compounds.ts'\\); console.log\\(COMPOUNDS.length\\)\")"
     ]
   }
 }

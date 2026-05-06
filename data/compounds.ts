@@ -2,6 +2,67 @@ export type Charge = "anionic" | "cationic" | "neutral";
 export type Route = "subq" | "im" | "oral" | "transdermal" | "intranasal" | "iv";
 export type Vehicle = "aqueous" | "powder" | "oil" | "cream" | "patch";
 
+export type Organ =
+  | "bloodVessels" | "giTract" | "mast" | "neurons" | "pituitary"
+  | "thyroid" | "liver" | "kidneys" | "heart";
+
+export const ORGAN_LABELS: Record<Organ, string> = {
+  bloodVessels: "Blood Vessels",
+  giTract: "GI Tract",
+  mast: "Mast Cells",
+  neurons: "Neurons",
+  pituitary: "Pituitary",
+  thyroid: "Thyroid",
+  liver: "Liver",
+  kidneys: "Kidneys",
+  heart: "Heart",
+};
+
+export const ORGAN_KEYS: Organ[] = [
+  "bloodVessels", "giTract", "mast", "neurons", "pituitary",
+  "thyroid", "liver", "kidneys", "heart",
+];
+
+// Each organ score is 0-10 representing relative load on that organ
+export type OrganLoad = Partial<Record<Organ, number>>;
+
+export type SafetyFlag =
+  | "insulin-sensitivity"
+  | "carcinogenic"
+  | "cardiovascular-load"
+  | "androgenic"
+  | "estrogenic"
+  | "hepatotoxic"
+  | "nephrotoxic"
+  | "immunosuppressive"
+  | "neurotoxic"
+  | "mast-cell-degranulation"
+  | "qt-prolongation"
+  | "thyroid-axis"
+  | "hpta-suppression"
+  | "tumor-growth"
+  | "bp-elevation"
+  | "ggt-elevation";
+
+export const SAFETY_FLAG_LABELS: Record<SafetyFlag, string> = {
+  "insulin-sensitivity": "Insulin sensitivity",
+  "carcinogenic": "Carcinogenic risk",
+  "cardiovascular-load": "Cardiovascular load",
+  "androgenic": "Androgenic",
+  "estrogenic": "Estrogenic",
+  "hepatotoxic": "Hepatotoxic",
+  "nephrotoxic": "Nephrotoxic",
+  "immunosuppressive": "Immunosuppressive",
+  "neurotoxic": "Neurotoxic potential",
+  "mast-cell-degranulation": "Mast cell degranulation",
+  "qt-prolongation": "QT prolongation",
+  "thyroid-axis": "Thyroid axis",
+  "hpta-suppression": "HPTA suppression",
+  "tumor-growth": "Tumor-growth concern",
+  "bp-elevation": "Blood pressure elevation",
+  "ggt-elevation": "GGT/liver enzyme elevation",
+};
+
 export type Compound = {
   id: string;
   name: string;
@@ -9,7 +70,9 @@ export type Compound = {
   category:
     | "growth" | "healing" | "metabolic" | "nootropic" | "longevity"
     | "bioregulator" | "hormone" | "vitamin" | "supplement" | "blend"
-    | "senolytic" | "peptide-misc" | "steroid" | "other";
+    | "senolytic" | "peptide-misc" | "steroid" | "other"
+    | "energy" | "immune" | "weight" | "repair" | "sleep" | "sexual"
+    | "anti-aging" | "cognitive" | "fat-loss" | "muscle";
   route: Route;
   isSupplement?: boolean;
   isBlend?: boolean;
@@ -35,6 +98,8 @@ export type Compound = {
   vulnerableResidues?: string;
   contaminationStrategy?: string;
   avoid?: string[];
+  organLoad?: OrganLoad;
+  safetyFlags?: SafetyFlag[];
 };
 
 export const COMPOUNDS: Compound[] = [
@@ -975,6 +1040,21 @@ export const COMPOUNDS: Compound[] = [
     mixNote: "GHK-Cu must be drawn in separate syringe. BPC+TB in main barrel.",
   },
 ];
+
+// Merge in extra library entries (deduped by id; first occurrence wins).
+import { EXTRA_COMPOUNDS } from "./compounds-extra";
+import { ORGAN_LOAD_OVERLAY, SAFETY_FLAG_OVERLAY } from "./compounds-overlay";
+const _seen = new Set(COMPOUNDS.map((c) => c.id));
+for (const c of EXTRA_COMPOUNDS) {
+  if (_seen.has(c.id)) continue;
+  COMPOUNDS.push(c);
+  _seen.add(c.id);
+}
+// Apply organ load + safety flag overlays to existing entries that don't already define them.
+for (const c of COMPOUNDS) {
+  if (!c.organLoad && ORGAN_LOAD_OVERLAY[c.id]) c.organLoad = ORGAN_LOAD_OVERLAY[c.id];
+  if (!c.safetyFlags && SAFETY_FLAG_OVERLAY[c.id]) c.safetyFlags = SAFETY_FLAG_OVERLAY[c.id];
+}
 
 export const COMPOUND_MAP = Object.fromEntries(COMPOUNDS.map((c) => [c.id, c]));
 
