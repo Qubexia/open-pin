@@ -1,10 +1,5 @@
-import { ComingSoon } from "@/components/coming-soon";
+import { MixScreen } from "@/components/mix-client";
 
 export default function MixPage() {
-  return (
-    <ComingSoon
-      title="Mix"
-      description="Compatibility grid for all compounds — color-coded by category."
-    />
-  );
+  return <MixScreen />;
 }

@@ -1,10 +1,5 @@
-import { ComingSoon } from "@/components/coming-soon";
+import { PillBinScreen } from "@/components/pill-bin-client";
 
 export default function PillBinPage() {
-  return (
-    <ComingSoon
-      title="Pill Bin"
-      description="Weekly pill organizer. Edit Slots, Load Layout, Save Layout, Report, Reset Week."
-    />
-  );
+  return <PillBinScreen />;
 }

@@ -1,10 +1,5 @@
-import { ComingSoon } from "@/components/coming-soon";
+import { InteractionsScreen } from "@/components/interactions-client";
 
 export default function InteractionsPage() {
-  return (
-    <ComingSoon
-      title="Interactions"
-      description="Pair matrix, cumulative organ load, safety flags, stack interactions, and recommendations."
-    />
-  );
+  return <InteractionsScreen />;
 }
