@@ -243,16 +243,6 @@ export const COMPOUNDS: Compound[] = [
     fasted: false,
   },
   {
-    id: "sermorelin", name: "Sermorelin",
-    category: "growth", route: "subq", charge: "neutral", vehicle: "aqueous",
-    defaultStrengthMg: 2, diluentType: "Bacteriostatic Water",
-    halfLife: "~10–12 min", peakTmax: "15 min",
-    evidenceSummary: "FDA-approved GHRH analog (1-29). Mild, well-tolerated.",
-    commonUses: ["GH optimization", "Anti-aging", "Sleep"],
-    dosingAdvice: "200–500 mcg before bed fasted.",
-    storage: "Refrigerator.", fasted: true,
-  },
-  {
     id: "igf-1-lr3", name: "IGF-1 LR3",
     category: "growth", route: "subq", charge: "neutral", vehicle: "aqueous",
     defaultStrengthMg: 1, diluentType: "Bacteriostatic Water / Acetic Acid",
@@ -525,13 +515,6 @@ export const COMPOUNDS: Compound[] = [
     storage: "Room temperature.", fasted: false,
   },
   // ─── Bioregulators (Khavinson) ────────────────────────────────────────────
-  {
-    id: "epithalon", name: "Epithalon", category: "bioregulator", route: "subq",
-    vehicle: "aqueous", defaultStrengthMg: 10, diluentType: "Bacteriostatic Water",
-    evidenceSummary: "Pineal gland bioregulator. Telomerase activation.", storage: "Refrigerator.",
-    commonUses: ["Anti-aging", "Telomerase"], dosingAdvice: "5–10 mg/day × 10 days courses.",
-    fasted: false,
-  },
   {
     id: "thymalin", name: "Thymalin",
     category: "bioregulator", route: "subq", vehicle: "aqueous",

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { db, type Vial, type DoseLog, type Protocol, type LabMarker, type OralSupplement } from "./db";
+import { ensureDemoSeed } from "./demo-seed";
 
 // ── Inventory (Injectables) ───────────────────────────────────────────────────
 type InventoryState = {
@@ -17,6 +18,7 @@ export const useInventory = create<InventoryState>((set) => ({
   loaded: false,
   load: async () => {
     if (!db) return;
+    await ensureDemoSeed();
     const vials = await db.vials.orderBy("createdAt").reverse().toArray();
     set({ vials, loaded: true });
   },
@@ -47,6 +49,7 @@ export const useOrals = create<OralsState>((set) => ({
   loaded: false,
   load: async () => {
     if (!db) return;
+    await ensureDemoSeed();
     const orals = await db.orals.orderBy("createdAt").reverse().toArray();
     set({ orals, loaded: true });
   },
@@ -77,6 +80,7 @@ export const useDoses = create<DoseState>((set) => ({
   loaded: false,
   load: async () => {
     if (!db) return;
+    await ensureDemoSeed();
     const doses = await db.doses.orderBy("loggedAt").reverse().limit(500).toArray();
     set({ doses, loaded: true });
   },
@@ -109,6 +113,7 @@ export const useProtocols = create<ProtocolState>((set) => ({
   loaded: false,
   load: async () => {
     if (!db) return;
+    await ensureDemoSeed();
     const protocols = await db.protocols.orderBy("startDate").reverse().toArray();
     set({ protocols, loaded: true });
   },
@@ -146,6 +151,7 @@ export const useLabs = create<LabsState>((set) => ({
   loaded: false,
   load: async () => {
     if (!db) return;
+    await ensureDemoSeed();
     const entries = await db.labs.orderBy("takenAt").reverse().toArray();
     set({ entries, loaded: true });
   },

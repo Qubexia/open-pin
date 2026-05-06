@@ -1,4 +1,4 @@
-import type { Protocol, FrequencyUnit } from "./db";
+import type { Protocol, FrequencyUnit, ProtocolStep } from "./db";
 
 const MS_DAY = 86_400_000;
 
@@ -22,11 +22,11 @@ export function daysElapsed(startDate: string): number {
   return Math.floor((Date.now() - new Date(startDate).getTime()) / MS_DAY);
 }
 
-export function currentStep(p: Protocol): { step: typeof p.steps extends undefined ? null : NonNullable<typeof p.steps>[0]; index: number } | null {
+export function currentStep(p: Protocol): { step: ProtocolStep; index: number } | null {
   if (!p.steps?.length) return null;
   let elapsed = daysElapsed(p.startDate);
   for (let i = 0; i < p.steps.length; i++) {
-    if (elapsed < p.steps[i].durationDays) return { step: p.steps[i] as any, index: i };
+    if (elapsed < p.steps[i].durationDays) return { step: p.steps[i], index: i };
     elapsed -= p.steps[i].durationDays;
   }
   return null;
@@ -38,19 +38,24 @@ export function totalDuration(p: Protocol): number {
 }
 
 export function daysRemaining(p: Protocol): number {
-  return Math.max(0, totalDuration(p) - daysElapsed(p.startDate));
+  const elapsed = daysElapsed(p.startDate);
+  if (elapsed < 0) return totalDuration(p);
+  return Math.max(0, totalDuration(p) - elapsed);
 }
 
 export function progressPct(p: Protocol): number {
+  const elapsed = daysElapsed(p.startDate);
+  if (elapsed <= 0) return 0;
   const total = totalDuration(p);
   if (!total) return 100;
-  return Math.min(100, Math.round((daysElapsed(p.startDate) / total) * 100));
+  return Math.min(100, Math.round((elapsed / total) * 100));
 }
 
 export function isDue(p: Protocol): boolean {
   if (!p.active) return false;
   if (daysRemaining(p) === 0) return false;
   const elapsed = daysElapsed(p.startDate);
+  if (elapsed < 0) return false;
   switch (p.frequency) {
     case "daily": return true;
     case "eod": return elapsed % 2 === 0;
@@ -62,5 +67,5 @@ export function isDue(p: Protocol): boolean {
 
 export function effectiveDose(p: Protocol): number {
   const step = currentStep(p);
-  return step ? (step.step as any).doseMcg : p.doseMcg;
+  return step ? step.step.doseMcg : p.doseMcg;
 }
