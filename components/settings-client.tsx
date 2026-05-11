@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { db } from "@/lib/db";
+import { useTheme } from "@/lib/stores";
 
 const BACKUP_KEY = "onepin_backups";
 const MAX_BACKUPS = 5;
@@ -53,7 +54,13 @@ async function importAll(json: string) {
 }
 
 export function SettingsScreen() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [backups, setBackups] = useState<Backup[]>(() => (typeof window !== "undefined" ? getBackups() : []));
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [status, setStatus] = useState("");
   const [apiKey, setApiKey] = useState(() =>
     typeof window !== "undefined" ? (localStorage.getItem("onepin_claude_key") ?? "") : ""
@@ -112,6 +119,33 @@ export function SettingsScreen() {
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-[var(--muted)]">Data management & preferences</p>
       </div>
+
+      {/* Appearance */}
+      <section className="space-y-2">
+        <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Appearance</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTheme("dark")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              mounted && theme === "dark" 
+                ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" 
+                : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
+            }`}
+          >
+            🌙 Dark
+          </button>
+          <button
+            onClick={() => setTheme("light")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              mounted && theme === "light" 
+                ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" 
+                : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
+            }`}
+          >
+            ☀️ Light
+          </button>
+        </div>
+      </section>
 
       {status && (
         <div className="rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/5 px-3 py-2 text-sm text-[var(--accent)]">

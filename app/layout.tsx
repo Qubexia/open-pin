@@ -25,7 +25,19 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                const theme = localStorage.getItem('onepin_theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', theme);
+              } catch (e) {}
+            })()
+          `
+        }} />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         <header className="sticky top-0 z-20 w-full border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur"
           style={{ paddingTop: "env(safe-area-inset-top)" }}>

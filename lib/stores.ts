@@ -166,3 +166,19 @@ export const useLabs = create<LabsState>((set) => ({
     set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
   },
 }));
+
+// ── Theme ──────────────────────────────────────────────────────────────────────
+type Theme = "dark" | "light";
+type ThemeState = {
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+};
+
+export const useTheme = create<ThemeState>((set) => ({
+  theme: typeof window !== "undefined" ? (localStorage.getItem("onepin_theme") as Theme ?? "dark") : "dark",
+  setTheme: (t) => {
+    localStorage.setItem("onepin_theme", t);
+    document.documentElement.setAttribute("data-theme", t);
+    set({ theme: t });
+  },
+}));
