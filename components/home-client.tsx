@@ -656,6 +656,7 @@ function SyringeCards({ due }: { due: Protocol[] }) {
   const { vials } = useInventory();
   const logDose = useDoses((s) => s.log);
   const [logging, setLogging] = useState<{ protocol: Protocol; syringeNumber: number; totalUnits?: number } | null>(null);
+  const [batchModal, setBatchModal] = useState<{ group: SyringeGroup; syringeNumber: number; totalUnits: number } | null>(null);
   const [batchLogging, setBatchLogging] = useState<Set<number>>(new Set());
 
   const syringes = useMemo(() => groupProtocolsIntoSyringes(due), [due]);
@@ -670,24 +671,23 @@ function SyringeCards({ due }: { due: Protocol[] }) {
     return Math.round((dose / concentrationMcgPerMl) * 100 * 10) / 10;
   };
 
-  const logSingle = async (p: Protocol) => {
-    const vial = vials.find((v) => v.id === p.vialId) ?? vials.find((v) => v.compoundId === p.compoundId);
-    await logDose({
-      compoundId: p.compoundId,
-      vialId: vial?.id,
-      doseMcg: effectiveDose(p),
-      timing: p.timing,
-    });
-  };
-
-  const logAllInGroup = async (group: SyringeGroup) => {
+  const logAllInGroup = async (group: SyringeGroup, loggedAt: string, siteId?: string, notes?: string) => {
     setBatchLogging((s) => {
       const next = new Set(s);
       group.protocols.forEach((p) => p.id && next.add(p.id));
       return next;
     });
     for (const p of group.protocols) {
-      await logSingle(p);
+      const vial = vials.find((v) => v.id === p.vialId) ?? vials.find((v) => v.compoundId === p.compoundId);
+      await logDose({
+        compoundId: p.compoundId,
+        vialId: vial?.id,
+        doseMcg: effectiveDose(p),
+        timing: p.timing,
+        siteId,
+        notes,
+        loggedAt,
+      });
     }
   };
 
@@ -804,7 +804,7 @@ function SyringeCards({ due }: { due: Protocol[] }) {
               <button
                 onClick={() => {
                   if (isMulti) {
-                    logAllInGroup(group);
+                    setBatchModal({ group, syringeNumber: i + 1, totalUnits });
                   } else {
                     const p = group.protocols[0];
                     setLogging({ protocol: p, syringeNumber: i + 1, totalUnits: unitsFor(p) ?? undefined });
@@ -835,6 +835,27 @@ function SyringeCards({ due }: { due: Protocol[] }) {
           protocolName={logging.protocol.name}
           syringeNumber={logging.syringeNumber}
           totalSyringeUnits={logging.totalUnits}
+        />
+      )}
+
+      {batchModal && (
+        <LogDoseModal
+          open={true}
+          onClose={() => setBatchModal(null)}
+          compoundId={batchModal.group.protocols[0]?.compoundId}
+          vialId={batchModal.group.protocols[0]?.vialId}
+          doseMcg={batchModal.group.protocols.reduce((sum, protocol) => sum + effectiveDose(protocol), 0)}
+          timing={batchModal.group.protocols[0]?.timing}
+          protocolName={`${batchModal.group.protocols.length} doses in syringe`}
+          syringeNumber={batchModal.syringeNumber}
+          totalSyringeUnits={batchModal.totalUnits}
+          confirmLabel={`Log All ${batchModal.group.protocols.length}`}
+          onSubmitOverride={async ({ loggedAt, siteId, notes }) => {
+            await logAllInGroup(batchModal.group, loggedAt, siteId, notes);
+          }}
+          onSkipOverride={async () => {
+            setBatchModal(null);
+          }}
         />
       )}
     </>

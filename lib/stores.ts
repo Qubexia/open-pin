@@ -71,8 +71,8 @@ type DoseState = {
   doses: DoseLog[];
   loaded: boolean;
   load: () => Promise<void>;
-  log: (d: Omit<DoseLog, "id" | "loggedAt">) => Promise<void>;
-  skip: (d: Omit<DoseLog, "id" | "loggedAt">) => Promise<void>;
+  log: (d: Omit<DoseLog, "id" | "loggedAt"> & { loggedAt?: string }) => Promise<void>;
+  skip: (d: Omit<DoseLog, "id" | "loggedAt"> & { loggedAt?: string }) => Promise<void>;
 };
 
 export const useDoses = create<DoseState>((set) => ({
@@ -86,13 +86,13 @@ export const useDoses = create<DoseState>((set) => ({
   },
   log: async (d) => {
     if (!db) return;
-    const row: DoseLog = { ...d, skipped: false, loggedAt: new Date().toISOString() };
+    const row: DoseLog = { ...d, skipped: false, loggedAt: d.loggedAt ?? new Date().toISOString() };
     const id = await db.doses.add(row);
     set((s) => ({ doses: [{ ...row, id }, ...s.doses] }));
   },
   skip: async (d) => {
     if (!db) return;
-    const row: DoseLog = { ...d, skipped: true, loggedAt: new Date().toISOString() };
+    const row: DoseLog = { ...d, skipped: true, loggedAt: d.loggedAt ?? new Date().toISOString() };
     const id = await db.doses.add(row);
     set((s) => ({ doses: [{ ...row, id }, ...s.doses] }));
   },

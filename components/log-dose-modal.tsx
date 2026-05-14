@@ -17,6 +17,22 @@ type Props = {
   protocolName?: string;
   syringeNumber?: number;
   totalSyringeUnits?: number;
+  onSubmitOverride?: (payload: {
+    compoundId: string;
+    vialId?: number;
+    doseMcg: number;
+    siteId?: string;
+    timing?: string;
+    notes?: string;
+    loggedAt: string;
+  }) => Promise<void>;
+  onSkipOverride?: (payload: {
+    compoundId: string;
+    doseMcg: number;
+    notes?: string;
+    loggedAt: string;
+  }) => Promise<void>;
+  confirmLabel?: string;
 };
 
 type Unit = "mcg" | "mg";
@@ -47,7 +63,36 @@ const labelOf = (r: Region) =>
   REGION_LABEL_OVERRIDE[r] ?? r.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
 export function LogDoseModal(props: Props) {
-  const { open, onClose, compoundId, vialId, doseMcg = 250, timing, protocolName, syringeNumber, totalSyringeUnits } = props;
+  if (!props.open) return null;
+  const modalKey = [
+    props.compoundId ?? "manual",
+    props.vialId ?? "none",
+    props.doseMcg ?? 250,
+    props.timing ?? "",
+    props.protocolName ?? "",
+    props.syringeNumber ?? "0",
+    props.totalSyringeUnits ?? "",
+    props.confirmLabel ?? "",
+  ].join("|");
+
+  return <LogDoseModalInner key={modalKey} {...props} />;
+}
+
+function LogDoseModalInner(props: Props) {
+  const {
+    open,
+    onClose,
+    compoundId,
+    vialId,
+    doseMcg = 250,
+    timing,
+    protocolName,
+    syringeNumber,
+    totalSyringeUnits,
+    onSubmitOverride,
+    onSkipOverride,
+    confirmLabel,
+  } = props;
   const { vials, loaded: vLoaded, load: loadV } = useInventory();
   const logDose = useDoses((s) => s.log);
   const skipDose = useDoses((s) => s.skip);
@@ -65,19 +110,6 @@ export function LogDoseModal(props: Props) {
   const [siteId, setSiteId] = useState<string | undefined>();
   const [selectedTiming, setSelectedTiming] = useState(timing ?? "");
   const [notes, setNotes] = useState("");
-
-  useEffect(() => {
-    if (open) {
-      setSelectedCompoundId(compoundId ?? COMPOUNDS[0].id);
-      setSelectedVialId(vialId);
-      setDoseValue(String(doseMcg));
-      setSelectedTiming(timing ?? "");
-      setNotes("");
-      setUnit("mcg");
-      setSiteId(undefined);
-      setBodyView("front");
-    }
-  }, [open, compoundId, vialId, doseMcg, timing]);
 
   useEffect(() => {
     if (open && !vLoaded) loadV();
@@ -114,27 +146,36 @@ export function LogDoseModal(props: Props) {
   const handleLog = async () => {
     if (doseMcgValue <= 0) return;
     const loggedAt = new Date(`${date}T${time}`).toISOString();
-    await logDose({
+    const payload = {
       compoundId: selectedCompoundId,
       vialId: selectedVialId,
       doseMcg: doseMcgValue,
       siteId,
       timing: selectedTiming || undefined,
       notes: notes.trim() || undefined,
-    });
+      loggedAt,
+    };
+    if (onSubmitOverride) await onSubmitOverride(payload);
+    else {
+      await logDose(payload);
+    }
     onClose();
   };
 
   const handleSkip = async () => {
-    await skipDose({
+    const loggedAt = new Date(`${date}T${time}`).toISOString();
+    const payload = {
       compoundId: selectedCompoundId,
       doseMcg: doseMcgValue,
       notes: notes.trim() || undefined,
-    });
+      loggedAt,
+    };
+    if (onSkipOverride) await onSkipOverride(payload);
+    else {
+      await skipDose(payload);
+    }
     onClose();
   };
-
-  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center px-2 sm:px-4">
@@ -327,7 +368,7 @@ export function LogDoseModal(props: Props) {
           </button>
           <button onClick={handleLog} disabled={doseMcgValue <= 0}
             className="flex-1 rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] disabled:opacity-40">
-            Log Dose
+            {confirmLabel ?? "Log Dose"}
           </button>
         </div>
       </div>
