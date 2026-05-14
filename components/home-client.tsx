@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { COMPOUNDS, getCompound, getCompoundName } from "@/data/compounds";
+import { effectiveDose, FREQ_LABELS, isDue, daysRemaining, daysElapsed, totalDuration, TIMING_LABELS } from "@/lib/protocol-utils";
+import type { Protocol } from "@/lib/db";
+import { useDoses, useInventory, useProtocols, useLabs, useOrals } from "@/lib/stores";
+import { LogDoseModal } from "./log-dose-modal";
+import { LabResultModal } from "./lab-result-modal";
+import { groupProtocolsIntoSyringes, type SyringeGroup } from "@/lib/syringe-grouping";
 import { COMMON_LAB_MARKERS } from "@/data/lab-markers";
-import { getCompound, getCompoundName } from "@/data/compounds";
 import { PRACTICES } from "@/data/best-practices";
-import { effectiveDose, FREQ_LABELS, isDue, daysRemaining, totalDuration } from "@/lib/protocol-utils";
-import type { DoseLog, FrequencyUnit, Protocol, ProtocolStep } from "@/lib/db";
-import { useDoses, useProtocols, useLabs, useOrals } from "@/lib/stores";
+import type { DoseLog, FrequencyUnit,ProtocolStep } from "@/lib/db";
 
 type Filter = "all" | "compound" | "supplement";
 type PillSlot = "AM" | "Mid" | "PM" | "Night";
@@ -277,6 +281,8 @@ export function HomeScreen() {
   const { orals, loaded: oLoaded, load: loadOrals } = useOrals();
   const [filter, setFilter] = useState<Filter>("all");
   const [pillSchedule, setPillSchedule] = useState<PillSchedule>(() => createEmptyPillSchedule());
+  const [manualLogOpen, setManualLogOpen] = useState(false);
+  const [labModalOpen, setLabModalOpen] = useState(false);
 
   useEffect(() => {
     if (!pLoaded) loadP();
@@ -400,11 +406,21 @@ export function HomeScreen() {
 
       {/* Today's Overview */}
       <Section title="Today's Overview" subtitle={todayStr} defaultOpen>
+        <button
+          type="button"
+          onClick={() => setManualLogOpen(true)}
+          className="mb-3 flex w-full items-center justify-center rounded-xl border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/15"
+        >
+          Log Dose
+        </button>
         <div className="grid grid-cols-2 gap-3">
           <Stat label="Pill Bin Slots" value={`${pillBinSlotsFilled}/${PILL_BIN_SLOTS.length}`} />
           <Stat label="Completed" value={`${displayCompletedToday.length}/${Math.max(displayDue.length, 1)}`} />
         </div>
       </Section>
+
+      {/* Syringe cards for due-today protocols */}
+      {due.length > 0 && <SyringeCards due={due} />}
 
       {/* Paused */}
       <Section title="Paused" count={displayPaused.length}>
@@ -443,6 +459,13 @@ export function HomeScreen() {
 
       {/* Labs */}
       <Section title="Labs" count={labs.length > 0 ? labs.length : labSuggestions.length}>
+        <button
+          type="button"
+          onClick={() => setLabModalOpen(true)}
+          className="mb-3 flex w-full items-center justify-center rounded-xl border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/15"
+        >
+          Add Lab Result
+        </button>
         {labs.length === 0 ? (
           <LabMarkerReferenceList markers={labSuggestions} />
         ) : (
@@ -464,6 +487,8 @@ export function HomeScreen() {
       <Section title="Ended Protocols" count={displayEnded.length}>
         <ProtocolList protocols={displayEnded} dimmed />
       </Section>
+      <LogDoseModal open={manualLogOpen} onClose={() => setManualLogOpen(false)} />
+      {labModalOpen && <LabResultModal open={labModalOpen} onClose={() => setLabModalOpen(false)} />}
 
       <p className="text-[10px] uppercase tracking-wider text-[var(--muted)] text-center pt-2">
         For research purposes only — not for human consumption.
@@ -624,6 +649,195 @@ function LabMarkerReferenceList({
         </li>
       ))}
     </ul>
+  );
+}
+
+function SyringeCards({ due }: { due: Protocol[] }) {
+  const { vials } = useInventory();
+  const logDose = useDoses((s) => s.log);
+  const [logging, setLogging] = useState<{ protocol: Protocol; syringeNumber: number; totalUnits?: number } | null>(null);
+  const [batchLogging, setBatchLogging] = useState<Set<number>>(new Set());
+
+  const syringes = useMemo(() => groupProtocolsIntoSyringes(due), [due]);
+
+  // Per-protocol unit calculation
+  const unitsFor = (p: Protocol): number | null => {
+    const vial = vials.find((v) => v.id === p.vialId) ?? vials.find((v) => v.compoundId === p.compoundId);
+    if (!vial?.reconstitutedBacWaterMl) return null;
+    const concentrationMcgPerMl = (vial.strengthMg * 1000) / vial.reconstitutedBacWaterMl;
+    if (!concentrationMcgPerMl) return null;
+    const dose = effectiveDose(p);
+    return Math.round((dose / concentrationMcgPerMl) * 100 * 10) / 10;
+  };
+
+  const logSingle = async (p: Protocol) => {
+    const vial = vials.find((v) => v.id === p.vialId) ?? vials.find((v) => v.compoundId === p.compoundId);
+    await logDose({
+      compoundId: p.compoundId,
+      vialId: vial?.id,
+      doseMcg: effectiveDose(p),
+      timing: p.timing,
+    });
+  };
+
+  const logAllInGroup = async (group: SyringeGroup) => {
+    setBatchLogging((s) => {
+      const next = new Set(s);
+      group.protocols.forEach((p) => p.id && next.add(p.id));
+      return next;
+    });
+    for (const p of group.protocols) {
+      await logSingle(p);
+    }
+  };
+
+  return (
+    <>
+      <div className="space-y-3">
+        {syringes.map((group, i) => {
+          const isMulti = group.protocols.length > 1;
+          const totalUnits = group.protocols.reduce((sum, p) => sum + (unitsFor(p) ?? 0), 0);
+          const allLogged = group.protocols.every((p) => p.id && batchLogging.has(p.id));
+
+          return (
+            <div key={group.id}
+              className={`rounded-2xl border bg-[var(--surface)] overflow-hidden ${
+                allLogged ? "opacity-50" : ""
+              }`}
+              style={{ borderLeftWidth: 3, borderLeftColor: group.pinAlone ? "var(--warning)" : "var(--accent)" }}
+            >
+              {/* Header */}
+              <div className="px-4 py-2 flex items-center justify-between border-b border-[var(--border)]">
+                <p className="text-xs font-semibold text-[var(--accent)] flex items-center gap-2 flex-wrap">
+                  Syringe {i + 1}
+                  {group.pinAlone && (
+                    <span className="text-[10px] rounded px-1.5 py-0.5 border border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--warning)]">
+                      ⚠ Solo
+                    </span>
+                  )}
+                  {isMulti && !group.pinAlone && (
+                    <span className="text-[10px] rounded px-1.5 py-0.5 border border-[var(--accent)]/40 bg-[var(--accent)]/10">
+                      ✦ Smart
+                    </span>
+                  )}
+                  {group.warnings.length > 0 && (
+                    <span className="text-[10px] rounded px-1.5 py-0.5 border border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--warning)]"
+                      title={group.warnings.join("\n")}>
+                      ⚠ {group.warnings.length}
+                    </span>
+                  )}
+                </p>
+                {totalUnits > 0 && (
+                  <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted)]">
+                    TOTAL {totalUnits.toFixed(1)}u
+                  </span>
+                )}
+              </div>
+
+              {/* Protocols inside the syringe */}
+              <ul className="divide-y divide-[var(--border)]">
+                {group.protocols.map((p) => {
+                  const compound = COMPOUNDS.find((c) => c.id === p.compoundId);
+                  const vial = vials.find((v) => v.id === p.vialId) ?? vials.find((v) => v.compoundId === p.compoundId);
+                  const dose = effectiveDose(p);
+                  const units = unitsFor(p);
+                  const dayInProtocol = daysElapsed(p.startDate) + 1;
+                  const route = compound?.route ?? "subq";
+                  const isLogged = p.id && batchLogging.has(p.id);
+
+                  return (
+                    <li key={p.id} className={`px-4 py-3 space-y-1.5 ${isLogged ? "opacity-60" : ""}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold leading-tight">{p.name}</p>
+                        {units !== null && (
+                          <span className="shrink-0 text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted)]">
+                            {units}u
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-[var(--accent)]">
+                        {FREQ_LABELS[p.frequency]} · Day {dayInProtocol}
+                      </p>
+                      <p className="text-xs text-[var(--muted)]">
+                        <span className="text-foreground font-medium">{dose}mcg</span> dose ·{" "}
+                        <span className="text-foreground font-medium">{route === "subq" ? "SubQ" : route.toUpperCase()}</span> route
+                        {vial?.reconstitutedBacWaterMl && (
+                          <> · <span className="text-foreground font-medium">{vial.reconstitutedBacWaterMl}mL BAC</span></>
+                        )}
+                      </p>
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {p.timing && (
+                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5">
+                            🕐 {TIMING_LABELS[p.timing] ?? p.timing}
+                          </span>
+                        )}
+                        {compound?.category && (
+                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted)] capitalize">
+                            {compound.category}
+                          </span>
+                        )}
+                        {compound?.charge && (
+                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted)] capitalize">
+                            {compound.charge}
+                          </span>
+                        )}
+                        {compound?.fasted && (
+                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--warning)]">
+                            Fasted
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Draw-in-order helper for multi-compound */}
+              {isMulti && (
+                <p className="px-4 pb-2 text-[11px] text-[var(--muted)]">
+                  Draw in order shown (top → bottom).{" "}
+                  <a href="/more/info" className="text-[var(--accent)]">More…</a>
+                </p>
+              )}
+
+              {/* Footer action */}
+              <button
+                onClick={() => {
+                  if (isMulti) {
+                    logAllInGroup(group);
+                  } else {
+                    const p = group.protocols[0];
+                    setLogging({ protocol: p, syringeNumber: i + 1, totalUnits: unitsFor(p) ?? undefined });
+                  }
+                }}
+                disabled={allLogged}
+                className={`w-full border-t border-[var(--border)] px-3 py-2.5 text-sm font-medium ${
+                  group.pinAlone
+                    ? "bg-[var(--warning)]/10 text-[var(--warning)] hover:bg-[var(--warning)]/15"
+                    : "bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/15"
+                } disabled:opacity-40`}
+              >
+                {allLogged ? "✓ Logged" : isMulti ? `Log All ${group.protocols.length}` : "Log Dose"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {logging && (
+        <LogDoseModal
+          open={true}
+          onClose={() => setLogging(null)}
+          compoundId={logging.protocol.compoundId}
+          vialId={logging.protocol.vialId}
+          doseMcg={effectiveDose(logging.protocol)}
+          timing={logging.protocol.timing}
+          protocolName={logging.protocol.name}
+          syringeNumber={logging.syringeNumber}
+          totalSyringeUnits={logging.totalUnits}
+        />
+      )}
+    </>
   );
 }
 

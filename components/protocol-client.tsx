@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { COMPOUNDS, getCompoundName } from "@/data/compounds";
 import { lookupCompat } from "@/data/interactions";
 import { type FrequencyUnit, type ProtocolStep } from "@/lib/db";
-import { FREQ_LABELS, TIMING_LABELS, daysRemaining, isDue, progressPct, currentStep, effectiveDose } from "@/lib/protocol-utils";
+import { FREQ_LABELS, TIMING_LABELS, daysRemaining, isDue, progressPct, currentStep, effectiveDose, totalDuration } from "@/lib/protocol-utils";
 import { SYRINGES, type SyringeKind, calcDraw, fmt } from "@/lib/syringe";
 import { useInventory, useProtocols } from "@/lib/stores";
 import { SiteGrid as SiteGridComponent } from "./sites-client";
@@ -410,22 +410,45 @@ function CompatCard({ verdict, rationale, a, b }: { verdict: string; rationale: 
 // ─── Protocol Screen (page entry point) ────────────────────────────────────────
 export function ProtocolScreen() {
   const [tab, setTab] = useState<"protocols" | "planner" | "sites">("protocols");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "ended">("all");
+  const [kindFilter, setKindFilter] = useState<"all" | "compound" | "supplement">("all");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"a-z" | "z-a" | "recent">("recent");
+  const { protocols, loaded, load } = useProtocols();
+  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+
+  const totalCount = protocols.length;
+  const activeCount = protocols.filter((p) => p.active && daysRemaining(p) > 0).length;
+  const endedCount = protocols.filter((p) => daysRemaining(p) === 0).length;
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    let list = protocols.filter((p) => {
+      if (statusFilter === "active" && !(p.active && daysRemaining(p) > 0)) return false;
+      if (statusFilter === "ended" && daysRemaining(p) > 0) return false;
+      if (kindFilter !== "all") {
+        const c = COMPOUNDS.find((x) => x.id === p.compoundId);
+        const isSupp = c?.isSupplement || c?.route === "oral";
+        if (kindFilter === "supplement" && !isSupp) return false;
+        if (kindFilter === "compound" && isSupp) return false;
+      }
+      if (q && !p.name.toLowerCase().includes(q) && !getCompoundName(p.compoundId).toLowerCase().includes(q))
+        return false;
+      return true;
+    });
+    if (sort === "a-z") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    else if (sort === "z-a") list = [...list].sort((a, b) => b.name.localeCompare(a.name));
+    else list = [...list].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    return list;
+  }, [protocols, statusFilter, kindFilter, query, sort]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Protocol</h1>
-          <p className="text-sm text-[var(--muted)]">Cycles, planner & injection sites</p>
-        </div>
-      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">Protocols</h1>
 
-      {/* Sub-tabs */}
       <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5">
         {(["protocols", "planner", "sites"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
+          <button key={t} onClick={() => setTab(t)}
             className={`flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition-colors ${
               tab === t ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]"
             }`}
@@ -436,18 +459,147 @@ export function ProtocolScreen() {
       </div>
 
       {tab === "protocols" && (
-        <div className="space-y-4">
-          <ProtocolList />
+        <>
+          <div className="flex justify-center gap-2">
+            {(["all", "compound", "supplement"] as const).map((f) => (
+              <button key={f} onClick={() => setKindFilter(f)}
+                className={`rounded-full px-4 py-1.5 text-xs font-medium border ${
+                  kindFilter === f
+                    ? "bg-[var(--accent)] text-[var(--accent-fg)] border-[var(--accent)]"
+                    : "border-[var(--border)] text-[var(--muted)]"
+                }`}
+              >
+                {f === "all" ? "All" : f === "compound" ? "💉 Compound" : "💊 Supplement"}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <ProtocolStat label="Total" value={totalCount} />
+            <ProtocolStat label="Active" value={activeCount} accent />
+            <ProtocolStat label="Ended" value={endedCount} muted />
+          </div>
+
+          <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5">
+            {(["all", "active", "ended"] as const).map((f) => (
+              <button key={f} onClick={() => setStatusFilter(f)}
+                className={`flex-1 rounded-md py-1 text-xs transition-colors ${
+                  statusFilter === f ? "bg-[var(--accent)] text-[var(--accent-fg)] font-medium" : "text-[var(--muted)]"
+                }`}
+              >
+                <span className="capitalize">{f}</span>
+                <span className="ml-1 opacity-70">
+                  ({f === "all" ? totalCount : f === "active" ? activeCount : endedCount})
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="relative">
+            <input value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search protocols…"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-9 py-2 text-sm pr-20" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm">🔍</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent text-xs text-[var(--muted)] focus:outline-none">
+              <option value="recent">Recent</option>
+              <option value="a-z">A-Z</option>
+              <option value="z-a">Z-A</option>
+            </select>
+          </div>
+
+          <ProtocolListFiltered protocols={filtered} />
+
           <AddProtocolForm />
-        </div>
+        </>
       )}
       {tab === "planner" && <Planner />}
       {tab === "sites" && <SiteGridSection />}
 
-      <p className="text-[10px] uppercase tracking-wider text-[var(--muted)]">
+      <p className="text-[10px] uppercase tracking-wider text-[var(--muted)] pt-2 text-center">
         For research purposes only — not for human consumption.
       </p>
     </div>
+  );
+}
+
+function ProtocolStat({ label, value, accent, muted }: { label: string; value: number; accent?: boolean; muted?: boolean }) {
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-center">
+      <p className={`text-2xl font-semibold ${accent ? "text-[var(--accent)]" : muted ? "text-[var(--muted)]" : ""}`}>{value}</p>
+      <p className="text-xs text-[var(--muted)] uppercase tracking-wider mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+function ProtocolListFiltered({ protocols: list }: { protocols: import("@/lib/db").Protocol[] }) {
+  const { remove, toggle } = useProtocols();
+  if (list.length === 0)
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
+        <p className="text-3xl">📋</p>
+        <p className="text-sm mt-1">No matches</p>
+        <p className="text-xs text-[var(--muted)] mt-1">Try clearing the search or filter.</p>
+      </div>
+    );
+
+  return (
+    <ul className="space-y-3">
+      {list.map((p) => {
+        const remaining = daysRemaining(p);
+        const due = isDue(p);
+        const finished = remaining === 0;
+        const pct = progressPct(p);
+        const step = currentStep(p);
+        const dose = effectiveDose(p);
+        const total = totalDuration(p);
+
+        return (
+          <li key={p.id} className={`rounded-xl border p-4 ${
+            finished ? "border-[var(--border)] opacity-60" :
+            due ? "border-[var(--accent)]/60 bg-[var(--accent)]/5" :
+            "border-[var(--border)] bg-[var(--surface)]"
+          }`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium">{p.name}</p>
+                  {due && !finished && <Badge color="green">Due today</Badge>}
+                  {finished && <Badge color="muted">Finished</Badge>}
+                  {!p.active && !finished && <Badge color="muted">Paused</Badge>}
+                  {p.pinAlone && <Badge color="yellow">Pin alone</Badge>}
+                </div>
+                <p className="text-sm text-[var(--muted)] mt-0.5">
+                  {getCompoundName(p.compoundId)} · {dose} mcg
+                  {p.timing ? ` · ${TIMING_LABELS[p.timing]}` : ""}
+                </p>
+                {step && (
+                  <p className="text-xs text-[var(--accent)] mt-0.5">
+                    Step {step.index + 1}{step.step.label ? `: ${step.step.label}` : ""}
+                  </p>
+                )}
+                <p className="text-xs text-[var(--muted)]">
+                  {FREQ_LABELS[p.frequency]}{p.frequencyXDays ? ` (every ${p.frequencyXDays}d)` : ""} · {remaining}/{total}d left
+                </p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <button onClick={() => p.id && toggle(p.id, !p.active)}
+                  className="text-xs rounded-md border border-[var(--border)] px-2 py-1 text-[var(--muted)]">
+                  {p.active ? "Pause" : "Resume"}
+                </button>
+                <button onClick={() => p.id && remove(p.id)}
+                  className="text-xs rounded-md border border-[var(--border)] px-2 py-1 text-[var(--muted)] hover:text-[var(--danger)] hover:border-[var(--danger)]">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="mt-3 h-1.5 w-full rounded-full bg-[var(--surface-2)]">
+              <div className="h-1.5 rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
