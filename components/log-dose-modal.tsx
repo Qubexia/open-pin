@@ -179,7 +179,7 @@ function LogDoseModalInner(props: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center px-2 sm:px-4">
-      <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-[var(--border)] bg-[var(--surface)] max-h-[92vh] overflow-y-auto">
+      <div className="ui-modal-shell w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--surface)]">
           <button onClick={onClose}
@@ -209,11 +209,11 @@ function LogDoseModalInner(props: Props) {
                 <button onClick={() => stepBy(-1)}
                   className="w-7 h-7 rounded bg-[var(--surface)] border border-[var(--border)] text-[var(--accent)]">−</button>
                 <input value={doseValue} onChange={(e) => setDoseValue(e.target.value)} inputMode="decimal"
-                  className="w-14 text-center rounded bg-[var(--surface)] border border-[var(--border)] py-1 text-sm" />
+                  className="w-14 rounded border border-[var(--border)] bg-[var(--surface)] py-1 text-center text-sm" />
                 <button onClick={() => stepBy(1)}
                   className="w-7 h-7 rounded bg-[var(--surface)] border border-[var(--border)] text-[var(--accent)]">+</button>
                 <select value={unit} onChange={(e) => setUnit(e.target.value as Unit)}
-                  className="rounded bg-[var(--surface)] border border-[var(--border)] px-2 py-1 text-xs">
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs">
                   <option value="mcg">mcg</option>
                   <option value="mg">mg</option>
                 </select>
@@ -234,7 +234,7 @@ function LogDoseModalInner(props: Props) {
             <div>
               <label className="text-xs text-[var(--muted)]">Compound</label>
               <select value={selectedCompoundId} onChange={(e) => setSelectedCompoundId(e.target.value)}
-                className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
+                className="ui-input mt-1">
                 {COMPOUNDS.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -244,7 +244,7 @@ function LogDoseModalInner(props: Props) {
             <div>
               <label className="text-xs text-[var(--muted)]">Vial</label>
               <select value={selectedVialId ?? ""} onChange={(e) => setSelectedVialId(e.target.value ? Number(e.target.value) : undefined)}
-                className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
+                className="ui-input mt-1">
                 <option value="">— None —</option>
                 {vials.filter((v) => v.compoundId === selectedCompoundId).map((v) => (
                   <option key={v.id} value={v.id}>
@@ -264,9 +264,9 @@ function LogDoseModalInner(props: Props) {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-1">
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
+                className="ui-input" />
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
+                className="ui-input" />
             </div>
           </div>
 
@@ -346,7 +346,7 @@ function LogDoseModalInner(props: Props) {
           <div>
             <label className="text-xs text-[var(--muted)]">Timing</label>
             <select value={selectedTiming} onChange={(e) => setSelectedTiming(e.target.value)}
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
+                className="ui-input mt-1">
               <option value="">— Any —</option>
               {Object.entries(TIMING_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -356,18 +356,18 @@ function LogDoseModalInner(props: Props) {
           <div>
             <label className="text-xs text-[var(--muted)]">Notes</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm resize-none" />
+              className="ui-input mt-1 w-full resize-none" />
           </div>
         </div>
 
         {/* Footer actions (sticky) */}
         <div className="sticky bottom-0 flex gap-2 p-3 border-t border-[var(--border)] bg-[var(--surface)]">
           <button onClick={handleSkip}
-            className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-sm font-medium text-[var(--muted)]">
+            className="ui-button-secondary flex-1 bg-[var(--surface-2)] px-3 py-2.5 text-sm font-medium text-[var(--muted)]">
             Skip
           </button>
           <button onClick={handleLog} disabled={doseMcgValue <= 0}
-            className="flex-1 rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] disabled:opacity-40">
+            className="ui-button-primary flex-1 px-3 py-2.5 text-sm font-medium disabled:opacity-40">
             {confirmLabel ?? "Log Dose"}
           </button>
         </div>

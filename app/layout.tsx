@@ -31,8 +31,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           __html: `
             (function() {
               try {
-                const theme = localStorage.getItem('onepin_theme') || 'dark';
+                const raw = localStorage.getItem('onepin_ui_settings');
+                const settings = raw ? JSON.parse(raw) : {};
+                const theme = settings.theme || localStorage.getItem('onepin_theme') || 'dark';
+                
                 document.documentElement.setAttribute('data-theme', theme);
+                document.documentElement.setAttribute('data-accent', settings.accent || 'green');
+                document.documentElement.setAttribute('data-density', settings.density || 'comfortable');
+                document.documentElement.setAttribute('data-motion', settings.motion || 'full');
               } catch (e) {}
             })()
           `

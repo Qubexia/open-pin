@@ -1,13 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/db";
-import { useTheme } from "@/lib/stores";
+import {
+  type AccentPreset,
+  type LandingPage,
+  useAppSettings,
+} from "@/lib/stores";
+import type { DoseLog, LabMarker, OralSupplement, Protocol, Vial } from "@/lib/db";
 
 const BACKUP_KEY = "onepin_backups";
 const MAX_BACKUPS = 5;
 
 type Backup = { ts: string; label: string; data: string };
+
+const ACCENT_OPTIONS: Array<{ value: AccentPreset; label: string; swatch: string }> = [
+  { value: "green", label: "Green", swatch: "#22c55e" },
+  { value: "blue", label: "Blue", swatch: "#38bdf8" },
+  { value: "amber", label: "Amber", swatch: "#f59e0b" },
+  { value: "rose", label: "Rose", swatch: "#f43f5e" },
+];
+
+const LANDING_OPTIONS: Array<{ value: LandingPage; label: string }> = [
+  { value: "/home", label: "Home" },
+  { value: "/protocols", label: "Protocols" },
+  { value: "/inventory", label: "Inventory" },
+  { value: "/calc", label: "Calc" },
+  { value: "/more", label: "More" },
+];
 
 function getBackups(): Backup[] {
   try {
@@ -43,27 +63,58 @@ async function exportAll(): Promise<string> {
 
 async function importAll(json: string) {
   if (!db) return;
-  const data = JSON.parse(json);
+  const data = JSON.parse(json) as {
+    vials?: Vial[];
+    doses?: DoseLog[];
+    protocols?: Protocol[];
+    labs?: LabMarker[];
+    orals?: OralSupplement[];
+  };
+  const stripId = <T extends { id?: number }>(row: T): Omit<T, "id"> => {
+    const clone = { ...row };
+    delete clone.id;
+    return clone;
+  };
   await db.transaction("rw", [db.vials, db.doses, db.protocols, db.labs, db.orals], async () => {
-    if (data.vials) { await db.vials.clear(); await db.vials.bulkAdd(data.vials.map((v: any) => { const { id, ...rest } = v; return rest; })); }
-    if (data.doses) { await db.doses.clear(); await db.doses.bulkAdd(data.doses.map((d: any) => { const { id, ...rest } = d; return rest; })); }
-    if (data.protocols) { await db.protocols.clear(); await db.protocols.bulkAdd(data.protocols.map((p: any) => { const { id, ...rest } = p; return rest; })); }
-    if (data.labs) { await db.labs.clear(); await db.labs.bulkAdd(data.labs.map((l: any) => { const { id, ...rest } = l; return rest; })); }
-    if (data.orals) { await db.orals.clear(); await db.orals.bulkAdd(data.orals.map((o: any) => { const { id, ...rest } = o; return rest; })); }
+    if (data.vials) { await db.vials.clear(); await db.vials.bulkAdd(data.vials.map(stripId)); }
+    if (data.doses) { await db.doses.clear(); await db.doses.bulkAdd(data.doses.map(stripId)); }
+    if (data.protocols) { await db.protocols.clear(); await db.protocols.bulkAdd(data.protocols.map(stripId)); }
+    if (data.labs) { await db.labs.clear(); await db.labs.bulkAdd(data.labs.map(stripId)); }
+    if (data.orals) { await db.orals.clear(); await db.orals.bulkAdd(data.orals.map(stripId)); }
   });
 }
 
 export function SettingsScreen() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const {
+    theme,
+    accent,
+    defaultLanding,
+    labsPreviewCount,
+    unitSystem,
+    density,
+    motion,
+    showAdherence,
+    showInventory,
+    showProtocols,
+    showLabs,
+    showCalc,
+    hydrate,
+    update,
+    reset,
+  } = useAppSettings();
   const [backups, setBackups] = useState<Backup[]>(() => (typeof window !== "undefined" ? getBackups() : []));
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
   const [status, setStatus] = useState("");
   const [apiKey, setApiKey] = useState(() =>
     typeof window !== "undefined" ? (localStorage.getItem("onepin_claude_key") ?? "") : ""
+  );
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  const summary = useMemo(
+    () => `${theme} theme · ${accent} accent · ${density} density`,
+    [theme, accent, density]
   );
 
   const handleExport = async () => {
@@ -92,7 +143,7 @@ export function SettingsScreen() {
         setBackups(getBackups());
         setStatus("Import successful. Reload to see changes.");
       } catch {
-        setStatus("Import failed — invalid file.");
+        setStatus("Import failed - invalid file.");
       }
     };
     reader.readAsText(file);
@@ -115,92 +166,177 @@ export function SettingsScreen() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-[var(--muted)]">Data management & preferences</p>
-      </div>
-
-      {/* Appearance */}
-      <section className="space-y-2">
-        <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Appearance</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTheme("dark")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-              mounted && theme === "dark" 
-                ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" 
-                : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
-            }`}
-          >
-            🌙 Dark
-          </button>
-          <button
-            onClick={() => setTheme("light")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-              mounted && theme === "light" 
-                ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]" 
-                : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]"
-            }`}
-          >
-            ☀️ Light
-          </button>
-        </div>
-      </section>
+        <p className="text-sm text-[var(--muted)]">Control the look, feel, and defaults across most of OnePin.</p>
+        <p className="text-xs text-[var(--muted)]">{summary}</p>
+      </header>
 
       {status && (
-        <div className="rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/5 px-3 py-2 text-sm text-[var(--accent)]">
+        <div className="ui-card rounded-lg border-[var(--accent)]/40 bg-[var(--accent)]/5 px-3 py-2 text-sm text-[var(--accent)]">
           {status}
         </div>
       )}
 
-      {/* Claude API key */}
-      <section className="space-y-2">
-        <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Claude AI (optional)</h2>
-        <p className="text-xs text-[var(--muted)]">Used for lab insights. Stored locally only.</p>
+      <section className="ui-card space-y-4 p-4">
+        <div>
+          <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Appearance & Layout</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">These settings affect most screens immediately.</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--muted)]">Theme</label>
+          <div className="ui-segment grid grid-cols-2 gap-1">
+            <ToggleButton active={theme === "dark"} onClick={() => update({ theme: "dark" })}>Dark</ToggleButton>
+            <ToggleButton active={theme === "light"} onClick={() => update({ theme: "light" })}>Light</ToggleButton>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--muted)]">Accent Color</label>
+          <div className="grid grid-cols-2 gap-2">
+            {ACCENT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => update({ accent: option.value })}
+                className={`ui-card flex items-center gap-3 px-3 py-2.5 text-sm ${
+                  accent === option.value ? "border-[var(--accent)]/55" : ""
+                }`}
+              >
+                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: option.swatch }} />
+                <span>{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--muted)]">Display Density</label>
+          <div className="ui-segment grid grid-cols-2 gap-1">
+            <ToggleButton active={density === "comfortable"} onClick={() => update({ density: "comfortable" })}>
+              Comfortable
+            </ToggleButton>
+            <ToggleButton active={density === "compact"} onClick={() => update({ density: "compact" })}>
+              Compact
+            </ToggleButton>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--muted)]">Animations</label>
+          <div className="ui-segment grid grid-cols-2 gap-1">
+            <ToggleButton active={motion === "full"} onClick={() => update({ motion: "full" })}>
+              Full Motion
+            </ToggleButton>
+            <ToggleButton active={motion === "reduced"} onClick={() => update({ motion: "reduced" })}>
+              Reduced
+            </ToggleButton>
+          </div>
+        </div>
+      </section>
+
+      <section className="ui-card space-y-4 p-4">
+        <div>
+          <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Units</h2>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--muted)]">Unit System</label>
+          <div className="ui-segment grid grid-cols-2 gap-1">
+            <ToggleButton active={unitSystem === "metric"} onClick={() => update({ unitSystem: "metric" })}>Metric (ml/mg)</ToggleButton>
+            <ToggleButton active={unitSystem === "imperial"} onClick={() => update({ unitSystem: "imperial" })}>Imperial (oz/gr)</ToggleButton>
+          </div>
+        </div>
+      </section>
+
+      <section className="ui-card space-y-4 p-4">
+        <div>
+          <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">App Modules</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">Enable or disable specific features of the application.</p>
+        </div>
+
+        <div className="space-y-3">
+          <FeatureToggle label="Adherence Tracking" active={showAdherence} onToggle={(v) => update({ showAdherence: v })} />
+          <FeatureToggle label="Inventory Management" active={showInventory} onToggle={(v) => update({ showInventory: v })} />
+          <FeatureToggle label="Protocols & Cycles" active={showProtocols} onToggle={(v) => update({ showProtocols: v })} />
+          <FeatureToggle label="Lab Results" active={showLabs} onToggle={(v) => update({ showLabs: v })} />
+          <FeatureToggle label="Calculators" active={showCalc} onToggle={(v) => update({ showCalc: v })} />
+        </div>
+      </section>
+
+      <section className="ui-card space-y-4 p-4">
+        <div>
+          <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">App Defaults</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">Choose where the app lands and how much content Home shows by default.</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--muted)]">Default landing page</label>
+          <select
+            value={defaultLanding}
+            onChange={(e) => update({ defaultLanding: e.target.value as LandingPage })}
+            className="ui-input"
+          >
+            {LANDING_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--muted)]">Labs preview count on Home</label>
+          <div className="ui-segment grid grid-cols-2 gap-1">
+            <ToggleButton active={labsPreviewCount === 4} onClick={() => update({ labsPreviewCount: 4 })}>
+              4 Results
+            </ToggleButton>
+            <ToggleButton active={labsPreviewCount === 8} onClick={() => update({ labsPreviewCount: 8 })}>
+              8 Results
+            </ToggleButton>
+          </div>
+        </div>
+      </section>
+
+      <section className="ui-card space-y-4 p-4">
+        <div>
+          <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Claude AI (optional)</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">Used for lab insights. Stored locally only.</p>
+        </div>
         <div className="flex gap-2">
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-ant-…"
-            className="flex-1 rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+            placeholder="sk-ant-..."
+            className="ui-input flex-1"
           />
-          <button onClick={handleSaveKey}
-            className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-fg)]">
+          <button onClick={handleSaveKey} className="ui-button-primary px-3 py-2 text-sm font-medium">
             Save
           </button>
         </div>
       </section>
 
-      {/* Export */}
-      <section className="space-y-2">
-        <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Export</h2>
-        <button onClick={handleExport}
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm text-left">
-          ↓ Download backup JSON
+      <section className="ui-card space-y-3 p-4">
+        <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Data</h2>
+        <button onClick={handleExport} className="ui-button-secondary w-full px-3 py-2.5 text-left text-sm">
+          Download backup JSON
         </button>
-      </section>
-
-      {/* Import */}
-      <section className="space-y-2">
-        <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Import</h2>
-        <p className="text-xs text-[var(--muted)]">Replaces all existing data with the imported file.</p>
-        <label className="block w-full cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm">
-          ↑ Choose JSON file…
+        <label className="ui-button-secondary block w-full cursor-pointer px-3 py-2.5 text-sm">
+          Choose JSON file...
           <input type="file" accept=".json,application/json" onChange={handleImportFile} className="hidden" />
         </label>
       </section>
 
-      {/* Rolling backups */}
       {backups.length > 0 && (
-        <section className="space-y-2">
+        <section className="ui-card space-y-2 p-4">
           <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Rolling backups (last {MAX_BACKUPS})</h2>
-          <ul className="space-y-1.5">
-            {backups.map((b, i) => (
-              <li key={i} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
-                <span className="text-xs text-[var(--muted)]">{b.label}</span>
-                <button onClick={() => handleRestoreBackup(b)}
-                  className="text-xs text-[var(--accent)] border border-[var(--accent)]/40 rounded px-2 py-0.5">
+          <ul className="space-y-2">
+            {backups.map((backup, index) => (
+              <li key={index} className="ui-card-muted flex items-center justify-between px-3 py-2 text-sm">
+                <span className="text-xs text-[var(--muted)]">{backup.label}</span>
+                <button onClick={() => handleRestoreBackup(backup)} className="ui-button-primary px-2.5 py-1 text-xs">
                   Restore
                 </button>
               </li>
@@ -209,9 +345,69 @@ export function SettingsScreen() {
         </section>
       )}
 
-      <p className="text-[10px] uppercase tracking-wider text-[var(--muted)]">
-        For research purposes only — not for human consumption.
+      <section className="ui-card space-y-3 p-4">
+        <h2 className="text-xs uppercase tracking-wider text-[var(--muted)]">Reset UI</h2>
+        <p className="text-xs text-[var(--muted)]">Restore the visual defaults without touching your saved data.</p>
+        <button
+          type="button"
+          onClick={() => {
+            reset();
+            setStatus("UI settings reset to defaults.");
+          }}
+          className="ui-button-secondary w-full px-3 py-2.5 text-sm"
+        >
+          Reset Appearance & Defaults
+        </button>
+      </section>
+
+      <p className="ui-disclaimer text-[10px] uppercase tracking-wider">
+        For research purposes only - not for human consumption.
       </p>
+    </div>
+  );
+}
+
+function ToggleButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-2 text-sm font-medium ${active ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FeatureToggle({
+  label,
+  active,
+  onToggle,
+}: {
+  label: string;
+  active: boolean;
+  onToggle: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm">{label}</span>
+      <button
+        type="button"
+        onClick={() => onToggle(!active)}
+        className={`relative h-5 w-9 rounded-full transition-colors ${active ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
+      >
+        <span
+          className={`absolute top-1 h-3 w-3 rounded-full bg-white transition-all ${active ? "left-5" : "left-1"}`}
+        />
+      </button>
     </div>
   );
 }

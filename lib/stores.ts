@@ -182,3 +182,108 @@ export const useTheme = create<ThemeState>((set) => ({
     set({ theme: t });
   },
 }));
+
+export type AccentPreset = "green" | "blue" | "amber" | "rose";
+export type DensityMode = "comfortable" | "compact";
+export type MotionMode = "full" | "reduced";
+export type LandingPage = "/home" | "/protocols" | "/inventory" | "/calc" | "/more";
+export type UnitSystem = "metric" | "imperial";
+
+export type AppSettings = {
+  theme: Theme;
+  accent: AccentPreset;
+  density: DensityMode;
+  motion: MotionMode;
+  defaultLanding: LandingPage;
+  labsPreviewCount: 4 | 8;
+  unitSystem: UnitSystem;
+  showAdherence: boolean;
+  showInventory: boolean;
+  showProtocols: boolean;
+  showLabs: boolean;
+  showCalc: boolean;
+};
+
+const APP_SETTINGS_KEY = "onepin_ui_settings";
+
+const DEFAULT_APP_SETTINGS: AppSettings = {
+  theme: "dark",
+  accent: "green",
+  density: "comfortable",
+  motion: "full",
+  defaultLanding: "/home",
+  labsPreviewCount: 4,
+  unitSystem: "metric",
+  showAdherence: true,
+  showInventory: true,
+  showProtocols: true,
+  showLabs: true,
+  showCalc: true,
+};
+
+function loadAppSettings(): AppSettings {
+  if (typeof window === "undefined") return DEFAULT_APP_SETTINGS;
+  try {
+    const raw = localStorage.getItem(APP_SETTINGS_KEY);
+    if (!raw) return DEFAULT_APP_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_APP_SETTINGS, ...parsed };
+  } catch {
+    return DEFAULT_APP_SETTINGS;
+  }
+}
+
+function applyAppSettings(settings: AppSettings) {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-theme", settings.theme);
+  document.documentElement.setAttribute("data-accent", settings.accent);
+  document.documentElement.setAttribute("data-density", settings.density);
+  document.documentElement.setAttribute("data-motion", settings.motion);
+  document.documentElement.setAttribute("dir", "ltr");
+  document.documentElement.lang = "en";
+}
+
+type AppSettingsState = AppSettings & {
+  loaded: boolean;
+  hydrate: () => void;
+  update: (patch: Partial<AppSettings>) => void;
+  reset: () => void;
+};
+
+export const useAppSettings = create<AppSettingsState>((set, get) => ({
+  ...DEFAULT_APP_SETTINGS,
+  loaded: false,
+  hydrate: () => {
+    const settings = loadAppSettings();
+    applyAppSettings(settings);
+    localStorage.setItem("onepin_theme", settings.theme);
+    set({ ...settings, loaded: true });
+  },
+  update: (patch) => {
+    const next = { ...get(), ...patch };
+    const settings: AppSettings = {
+      theme: next.theme,
+      accent: next.accent,
+      density: next.density,
+      motion: next.motion,
+      defaultLanding: next.defaultLanding,
+      labsPreviewCount: next.labsPreviewCount,
+      unitSystem: next.unitSystem,
+      showAdherence: next.showAdherence,
+      showInventory: next.showInventory,
+      showProtocols: next.showProtocols,
+      showLabs: next.showLabs,
+      showCalc: next.showCalc,
+    };
+    localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem("onepin_theme", settings.theme);
+    applyAppSettings(settings);
+    set(settings);
+  },
+  reset: () => {
+    localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(DEFAULT_APP_SETTINGS));
+    localStorage.setItem("onepin_theme", DEFAULT_APP_SETTINGS.theme);
+    applyAppSettings(DEFAULT_APP_SETTINGS);
+    set({ ...DEFAULT_APP_SETTINGS, loaded: true });
+  },
+}));

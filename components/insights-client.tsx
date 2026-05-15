@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getCompoundName } from "@/data/compounds";
-import { useDoses, useLabs, useProtocols } from "@/lib/stores";
+import { useAppSettings, useDoses, useLabs, useProtocols } from "@/lib/stores";
 
 type Range = { start: Date; end: Date; label: string };
 
@@ -88,6 +88,9 @@ export function InsightsScreen() {
   const { doses, loaded: dLoaded, load: loadD } = useDoses();
   const { protocols, loaded: pLoaded, load: loadP } = useProtocols();
   const { entries: labs, loaded: lLoaded, load: loadL } = useLabs();
+  const { hydrate: hydrateAppSettings } = useAppSettings();
+
+
   const ranges = useMemo(() => buildWeeks(12), []);
   const [stored, setStored] = useState<Record<string, StoredInsight>>({});
 
@@ -95,8 +98,9 @@ export function InsightsScreen() {
     if (!dLoaded) loadD();
     if (!pLoaded) loadP();
     if (!lLoaded) loadL();
+    hydrateAppSettings();
     setStored(loadInsights());
-  }, [dLoaded, loadD, pLoaded, loadP, lLoaded, loadL]);
+  }, [dLoaded, loadD, pLoaded, loadP, lLoaded, loadL, hydrateAppSettings]);
 
   const generate = (range: Range) => {
     const key = range.label;
@@ -110,10 +114,10 @@ export function InsightsScreen() {
   return (
     <div className="space-y-4">
       <Link href="/more" className="inline-block text-xs rounded-md border border-[var(--border)] px-3 py-1.5 text-[var(--muted)]">
-        ← Back to More
+        {"← Back to More"}
       </Link>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">AI Insight Reports</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{"AI Insight Reports"}</h1>
         <p className="text-sm text-[var(--muted)]">
           {apiKey
             ? "Using rule-based analysis. AI integration is local-first."

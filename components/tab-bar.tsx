@@ -2,24 +2,37 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const TABS = [
-  { href: "/home", label: "Home", icon: "⌂" },
-  { href: "/inventory", label: "Inventory", icon: "▣" },
-  { href: "/protocols", label: "Protocols", icon: "▤" },
-  { href: "/calc", label: "Calc", icon: "▦" },
-  { href: "/more", label: "More", icon: "⋯" },
-];
+import { useAppSettings } from "@/lib/stores";
 
 export function TabBar() {
   const pathname = usePathname();
+  const {
+    showInventory,
+    showProtocols,
+    showCalc,
+  } = useAppSettings();
+
+
+  const allTabs = [
+    { href: "/home", label: "Home", icon: "⌂", show: true },
+    { href: "/inventory", label: "Inventory", icon: "▣", show: showInventory },
+    { href: "/protocols", label: "Protocols", icon: "▤", show: showProtocols },
+    { href: "/calc", label: "Calc", icon: "▦", show: showCalc },
+    { href: "/more", label: "More", icon: "⋯", show: true },
+  ];
+
+  const visibleTabs = allTabs.filter(t => t.show);
+
   return (
     <nav
       className="fixed bottom-0 inset-x-0 z-30 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <ul className="mx-auto max-w-2xl grid grid-cols-5">
-        {TABS.map((t) => {
+      <ul
+        className="mx-auto max-w-2xl grid"
+        style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}
+      >
+        {visibleTabs.map((t) => {
           const active = pathname?.startsWith(t.href);
           return (
             <li key={t.href}>

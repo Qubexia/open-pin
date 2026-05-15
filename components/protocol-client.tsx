@@ -6,8 +6,9 @@ import { lookupCompat } from "@/data/interactions";
 import { type FrequencyUnit, type ProtocolStep } from "@/lib/db";
 import { FREQ_LABELS, TIMING_LABELS, daysRemaining, isDue, progressPct, currentStep, effectiveDose, totalDuration } from "@/lib/protocol-utils";
 import { SYRINGES, type SyringeKind, calcDraw, fmt } from "@/lib/syringe";
-import { useInventory, useProtocols } from "@/lib/stores";
+import { useInventory, useProtocols, useAppSettings } from "@/lib/stores";
 import { SiteGrid as SiteGridComponent } from "./sites-client";
+import Link from "next/link";
 
 const FREQUENCIES: FrequencyUnit[] = ["daily", "eod", "3x-week", "weekly", "every-x-days"];
 
@@ -30,11 +31,10 @@ export function ProtocolList() {
         const dose = effectiveDose(p);
 
         return (
-          <li key={p.id} className={`rounded-xl border p-4 ${
-            finished ? "border-[var(--border)] opacity-60" :
-            due ? "border-[var(--accent)]/60 bg-[var(--accent)]/5" :
-            "border-[var(--border)] bg-[var(--surface)]"
-          }`}>
+          <li key={p.id} className={`rounded-xl border p-4 ${finished ? "border-[var(--border)] opacity-60" :
+              due ? "border-[var(--accent)]/60 bg-[var(--accent)]/5" :
+                "border-[var(--border)] bg-[var(--surface)]"
+            }`}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -415,7 +415,13 @@ export function ProtocolScreen() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"a-z" | "z-a" | "recent">("recent");
   const { protocols, loaded, load } = useProtocols();
-  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  const { showProtocols, showCalc, showAdherence, hydrate: hydrateAppSettings } = useAppSettings();
+
+
+  useEffect(() => {
+    if (!loaded) load();
+    hydrateAppSettings();
+  }, [loaded, load, hydrateAppSettings]);
 
   const totalCount = protocols.length;
   const activeCount = protocols.filter((p) => p.active && daysRemaining(p) > 0).length;
@@ -442,18 +448,41 @@ export function ProtocolScreen() {
     return list;
   }, [protocols, statusFilter, kindFilter, query, sort]);
 
+  const visibleTabs = [
+    { id: "protocols", label: "Protocols", show: showProtocols },
+    { id: "planner", label: "Planner", show: showCalc },
+    { id: "sites", label: "Sites", show: showAdherence },
+  ].filter(t => t.show);
+
+  // Fallback if current tab is hidden
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.find(vt => vt.id === tab)) {
+      setTab(visibleTabs[0].id as any);
+    }
+  }, [visibleTabs, tab]);
+
+  if (visibleTabs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <div className="text-5xl">📋</div>
+        <h2 className="text-xl font-semibold">{"Protocols Disabled"}</h2>
+        <p className="text-[var(--muted)] max-w-xs">{"You can enable Protocols and Calculators in the settings panel."}</p>
+        <Link href="/more/settings" className="text-[var(--accent)] font-medium">{"Go to Settings"}</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Protocols</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{"Protocols & Planning"}</h1>
 
       <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5">
-        {(["protocols", "planner", "sites"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition-colors ${
-              tab === t ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]"
-            }`}
+        {visibleTabs.map((vt) => (
+          <button key={vt.id} onClick={() => setTab(vt.id as any)}
+            className={`flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition-colors ${tab === vt.id ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]"
+              }`}
           >
-            {t === "protocols" ? "Protocols" : t === "planner" ? "Planner" : "Sites"}
+            {vt.label}
           </button>
         ))}
       </div>
@@ -463,11 +492,10 @@ export function ProtocolScreen() {
           <div className="flex justify-center gap-2">
             {(["all", "compound", "supplement"] as const).map((f) => (
               <button key={f} onClick={() => setKindFilter(f)}
-                className={`rounded-full px-4 py-1.5 text-xs font-medium border ${
-                  kindFilter === f
+                className={`rounded-full px-4 py-1.5 text-xs font-medium border transition-colors ${kindFilter === f
                     ? "bg-[var(--accent)] text-[var(--accent-fg)] border-[var(--accent)]"
                     : "border-[var(--border)] text-[var(--muted)]"
-                }`}
+                  }`}
               >
                 {f === "all" ? "All" : f === "compound" ? "💉 Compound" : "💊 Supplement"}
               </button>
@@ -475,19 +503,18 @@ export function ProtocolScreen() {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <ProtocolStat label="Total" value={totalCount} />
-            <ProtocolStat label="Active" value={activeCount} accent />
-            <ProtocolStat label="Ended" value={endedCount} muted />
+            <ProtocolStat label={"Total"} value={totalCount} />
+            <ProtocolStat label={"Active"} value={activeCount} accent />
+            <ProtocolStat label={"Ended"} value={endedCount} muted />
           </div>
 
           <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5">
             {(["all", "active", "ended"] as const).map((f) => (
               <button key={f} onClick={() => setStatusFilter(f)}
-                className={`flex-1 rounded-md py-1 text-xs transition-colors ${
-                  statusFilter === f ? "bg-[var(--accent)] text-[var(--accent-fg)] font-medium" : "text-[var(--muted)]"
-                }`}
+                className={`flex-1 rounded-md py-1 text-xs transition-colors ${statusFilter === f ? "bg-[var(--accent)] text-[var(--accent-fg)] font-medium" : "text-[var(--muted)]"
+                  }`}
               >
-                <span className="capitalize">{f}</span>
+                <span className="capitalize">{f === "all" ? "All" : f === "active" ? "Active" : "Ended"}</span>
                 <span className="ml-1 opacity-70">
                   ({f === "all" ? totalCount : f === "active" ? activeCount : endedCount})
                 </span>
@@ -497,12 +524,12 @@ export function ProtocolScreen() {
 
           <div className="relative">
             <input value={query} onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search protocols…"
+              placeholder={"Search protocols…"}
               className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-9 py-2 text-sm pr-20" />
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm">🔍</span>
             <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}
               className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent text-xs text-[var(--muted)] focus:outline-none">
-              <option value="recent">Recent</option>
+              <option value="recent">{"Recent"}</option>
               <option value="a-z">A-Z</option>
               <option value="z-a">Z-A</option>
             </select>
@@ -517,7 +544,7 @@ export function ProtocolScreen() {
       {tab === "sites" && <SiteGridSection />}
 
       <p className="text-[10px] uppercase tracking-wider text-[var(--muted)] pt-2 text-center">
-        For research purposes only — not for human consumption.
+        {"For research purposes only — not for human consumption."}
       </p>
     </div>
   );
@@ -555,11 +582,10 @@ function ProtocolListFiltered({ protocols: list }: { protocols: import("@/lib/db
         const total = totalDuration(p);
 
         return (
-          <li key={p.id} className={`rounded-xl border p-4 ${
-            finished ? "border-[var(--border)] opacity-60" :
-            due ? "border-[var(--accent)]/60 bg-[var(--accent)]/5" :
-            "border-[var(--border)] bg-[var(--surface)]"
-          }`}>
+          <li key={p.id} className={`rounded-xl border p-4 ${finished ? "border-[var(--border)] opacity-60" :
+              due ? "border-[var(--accent)]/60 bg-[var(--accent)]/5" :
+                "border-[var(--border)] bg-[var(--surface)]"
+            }`}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">

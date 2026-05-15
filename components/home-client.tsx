@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { COMPOUNDS, getCompound, getCompoundName } from "@/data/compounds";
 import { effectiveDose, FREQ_LABELS, isDue, daysRemaining, daysElapsed, totalDuration, TIMING_LABELS } from "@/lib/protocol-utils";
 import type { Protocol } from "@/lib/db";
-import { useDoses, useInventory, useProtocols, useLabs, useOrals } from "@/lib/stores";
+import { useAppSettings, useDoses, useInventory, useProtocols, useLabs, useOrals } from "@/lib/stores";
 import { LogDoseModal } from "./log-dose-modal";
 import { LabResultModal } from "./lab-result-modal";
 import { groupProtocolsIntoSyringes, type SyringeGroup } from "@/lib/syringe-grouping";
 import { COMMON_LAB_MARKERS } from "@/data/lab-markers";
 import { PRACTICES } from "@/data/best-practices";
-import type { DoseLog, FrequencyUnit,ProtocolStep } from "@/lib/db";
+import type { DoseLog, FrequencyUnit, ProtocolStep } from "@/lib/db";
 
 type Filter = "all" | "compound" | "supplement";
 type PillSlot = "AM" | "Mid" | "PM" | "Night";
@@ -279,25 +279,33 @@ export function HomeScreen() {
   const { doses, loaded: dLoaded, load: loadD } = useDoses();
   const { entries: labs, loaded: lLoaded, load: loadLabs } = useLabs();
   const { orals, loaded: oLoaded, load: loadOrals } = useOrals();
+  const {
+    labsPreviewCount,
+    showAdherence,
+    showInventory,
+    showProtocols,
+    showLabs,
+    hydrate: hydrateAppSettings,
+  } = useAppSettings();
   const [filter, setFilter] = useState<Filter>("all");
   const [pillSchedule, setPillSchedule] = useState<PillSchedule>(() => createEmptyPillSchedule());
   const [manualLogOpen, setManualLogOpen] = useState(false);
   const [labModalOpen, setLabModalOpen] = useState(false);
+
 
   useEffect(() => {
     if (!pLoaded) loadP();
     if (!dLoaded) loadD();
     if (!lLoaded) loadLabs();
     if (!oLoaded) loadOrals();
-  }, [pLoaded, loadP, dLoaded, loadD, lLoaded, loadLabs, oLoaded, loadOrals]);
+    hydrateAppSettings();
+  }, [pLoaded, loadP, dLoaded, loadD, lLoaded, loadLabs, oLoaded, loadOrals, hydrateAppSettings]);
 
   useEffect(() => {
     const syncPillSchedule = () => setPillSchedule(loadPillSchedule());
-
     syncPillSchedule();
     window.addEventListener("focus", syncPillSchedule);
     window.addEventListener("storage", syncPillSchedule);
-
     return () => {
       window.removeEventListener("focus", syncPillSchedule);
       window.removeEventListener("storage", syncPillSchedule);
@@ -305,7 +313,7 @@ export function HomeScreen() {
   }, []);
 
   const today = new Date();
-  const todayStr = today.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const todayStr = today.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const todayKey = today.toISOString().slice(0, 10);
   const todayStart = new Date(today);
   todayStart.setHours(0, 0, 0, 0);
@@ -393,9 +401,9 @@ export function HomeScreen() {
       </div>
 
       {/* No supplements scheduled banner */}
-      {displaySupplementEntries.length === 0 && filter !== "compound" && (
+      {showInventory && displaySupplementEntries.length === 0 && filter !== "compound" && (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-3 text-center">
-          <p className="text-sm font-medium">No supplements scheduled today</p>
+          <p className="text-sm font-medium">{"No supplements scheduled today"}</p>
           <p className="text-xs text-[var(--muted)] mt-1">
             {orals.length === 0
               ? "Add supplements in Inventory, then place them in Pill Bin to track daily and weekly intake."
@@ -405,88 +413,102 @@ export function HomeScreen() {
       )}
 
       {/* Today's Overview */}
-      <Section title="Today's Overview" subtitle={todayStr} defaultOpen>
-        <button
-          type="button"
-          onClick={() => setManualLogOpen(true)}
-          className="mb-3 flex w-full items-center justify-center rounded-xl border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/15"
-        >
-          Log Dose
-        </button>
-        <div className="grid grid-cols-2 gap-3">
-          <Stat label="Pill Bin Slots" value={`${pillBinSlotsFilled}/${PILL_BIN_SLOTS.length}`} />
-          <Stat label="Completed" value={`${displayCompletedToday.length}/${Math.max(displayDue.length, 1)}`} />
-        </div>
-      </Section>
+      {showAdherence && (
+        <Section title="Today's Overview" subtitle={todayStr} defaultOpen>
+          <button
+            type="button"
+            onClick={() => setManualLogOpen(true)}
+            className="mb-3 flex w-full items-center justify-center rounded-xl border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/15"
+          >
+            Log Dose
+          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <Stat label="Pill Bin Slots" value={`${pillBinSlotsFilled}/${PILL_BIN_SLOTS.length}`} />
+            <Stat label="Completed" value={`${displayCompletedToday.length}/${Math.max(displayDue.length, 1)}`} />
+          </div>
+        </Section>
+      )}
 
       {/* Syringe cards for due-today protocols */}
-      {due.length > 0 && <SyringeCards due={due} />}
+      {showAdherence && due.length > 0 && <SyringeCards due={due} />}
 
       {/* Paused */}
-      <Section title="Paused" count={displayPaused.length}>
-        <ProtocolList protocols={displayPaused} />
-      </Section>
+      {showProtocols && (
+        <Section title="Paused" count={displayPaused.length}>
+          <ProtocolList protocols={displayPaused} />
+        </Section>
+      )}
 
       {/* Upcoming Scheduled */}
-      <Section title="Upcoming Scheduled" count={displayUpcoming.length}>
-        <ProtocolList protocols={displayUpcoming} />
-      </Section>
+      {showProtocols && (
+        <Section title="Upcoming Scheduled" count={displayUpcoming.length}>
+          <ProtocolList protocols={displayUpcoming} />
+        </Section>
+      )}
 
       {/* Calendar */}
-      <Section title="Calendar">
-        <CalendarMonth doses={calendarDoses} />
-      </Section>
+      {showAdherence && (
+        <Section title="Calendar">
+          <CalendarMonth doses={calendarDoses} />
+        </Section>
+      )}
 
       {/* Completed today */}
-      <Section title="Completed" count={displayCompletedToday.length}>
-        <DoseList doses={displayCompletedToday} />
-      </Section>
+      {showAdherence && (
+        <Section title="Completed" count={displayCompletedToday.length}>
+          <DoseList doses={displayCompletedToday} />
+        </Section>
+      )}
 
       {/* Rest Days */}
-      <Section title="Rest Days" count={displayRestDays.length}>
-        <ProtocolList protocols={displayRestDays} />
-      </Section>
-
-      {/* Off Phase */}
-      <Section title="Off Phase" count={referenceDashboard.offPhaseNotes.length}>
-        <PhaseWindowList items={referenceDashboard.offPhaseNotes} />
-      </Section>
+      {showProtocols && (
+        <Section title="Rest Days" count={displayRestDays.length}>
+          <ProtocolList protocols={displayRestDays} />
+        </Section>
+      )}
 
       {/* Supplement Levels */}
-      <Section title="Supplement Levels" count={displaySupplementLevels.length}>
-        <SupplementLevelList items={displaySupplementLevels} />
-      </Section>
+      {showInventory && (
+        <Section title="Supplement Levels" count={displaySupplementLevels.length}>
+          <SupplementLevelList items={displaySupplementLevels} />
+        </Section>
+      )}
 
       {/* Labs */}
-      <Section title="Labs" count={labs.length > 0 ? labs.length : labSuggestions.length}>
-        <button
-          type="button"
-          onClick={() => setLabModalOpen(true)}
-          className="mb-3 flex w-full items-center justify-center rounded-xl border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/15"
-        >
-          Add Lab Result
-        </button>
-        {labs.length === 0 ? (
-          <LabMarkerReferenceList markers={labSuggestions} />
-        ) : (
-          <ul className="space-y-1.5">
-            {labs.slice(0, 4).map((lab) => (
-              <li key={lab.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{lab.marker}</span>
-                  <span className="text-xs text-[var(--muted)]">{new Date(lab.takenAt).toLocaleDateString()}</span>
-                </div>
-                <p className="text-xs text-[var(--muted)] mt-1">{lab.value} {lab.unit}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
+      {showLabs && (
+        <Section title="Labs" count={labs.length > 0 ? labs.length : labSuggestions.length}>
+          <button
+            type="button"
+            onClick={() => setLabModalOpen(true)}
+            className="mb-3 flex w-full items-center justify-center rounded-xl border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)] transition hover:bg-[var(--accent)]/15"
+          >
+            Add Lab Result
+          </button>
+          {labs.length === 0 ? (
+            <LabMarkerReferenceList markers={labSuggestions} />
+          ) : (
+            <ul className="space-y-1.5">
+              {labs.slice(0, labsPreviewCount).map((lab) => (
+                <li key={lab.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">{lab.marker}</span>
+                    <span className="text-xs text-[var(--muted)]">{new Date(lab.takenAt).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-xs text-[var(--muted)] mt-1">{lab.value} {lab.unit}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      )}
 
       {/* Ended Protocols */}
-      <Section title="Ended Protocols" count={displayEnded.length}>
-        <ProtocolList protocols={displayEnded} dimmed />
-      </Section>
+      {showProtocols && (
+        <Section title="Ended Protocols" count={displayEnded.length}>
+          <ProtocolList protocols={displayEnded} dimmed />
+        </Section>
+      )}
+
       <LogDoseModal open={manualLogOpen} onClose={() => setManualLogOpen(false)} />
       {labModalOpen && <LabResultModal open={labModalOpen} onClose={() => setLabModalOpen(false)} />}
 
@@ -655,13 +677,12 @@ function LabMarkerReferenceList({
 function SyringeCards({ due }: { due: Protocol[] }) {
   const { vials } = useInventory();
   const logDose = useDoses((s) => s.log);
-  const [logging, setLogging] = useState<{ protocol: Protocol; syringeNumber: number; totalUnits?: number } | null>(null);
-  const [batchModal, setBatchModal] = useState<{ group: SyringeGroup; syringeNumber: number; totalUnits: number } | null>(null);
   const [batchLogging, setBatchLogging] = useState<Set<number>>(new Set());
+  const [batchModal, setBatchModal] = useState<{ group: SyringeGroup; syringeNumber: number; totalUnits: number } | null>(null);
+  const [logging, setLogging] = useState<{ protocol: Protocol; syringeNumber: number; totalUnits?: number } | null>(null);
 
   const syringes = useMemo(() => groupProtocolsIntoSyringes(due), [due]);
 
-  // Per-protocol unit calculation
   const unitsFor = (p: Protocol): number | null => {
     const vial = vials.find((v) => v.id === p.vialId) ?? vials.find((v) => v.compoundId === p.compoundId);
     if (!vial?.reconstitutedBacWaterMl) return null;
@@ -706,7 +727,6 @@ function SyringeCards({ due }: { due: Protocol[] }) {
               }`}
               style={{ borderLeftWidth: 3, borderLeftColor: group.pinAlone ? "var(--warning)" : "var(--accent)" }}
             >
-              {/* Header */}
               <div className="px-4 py-2 flex items-center justify-between border-b border-[var(--border)]">
                 <p className="text-xs font-semibold text-[var(--accent)] flex items-center gap-2 flex-wrap">
                   Syringe {i + 1}
@@ -720,12 +740,6 @@ function SyringeCards({ due }: { due: Protocol[] }) {
                       ✦ Smart
                     </span>
                   )}
-                  {group.warnings.length > 0 && (
-                    <span className="text-[10px] rounded px-1.5 py-0.5 border border-[var(--warning)]/40 bg-[var(--warning)]/10 text-[var(--warning)]"
-                      title={group.warnings.join("\n")}>
-                      ⚠ {group.warnings.length}
-                    </span>
-                  )}
                 </p>
                 {totalUnits > 0 && (
                   <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted)]">
@@ -734,7 +748,6 @@ function SyringeCards({ due }: { due: Protocol[] }) {
                 )}
               </div>
 
-              {/* Protocols inside the syringe */}
               <ul className="divide-y divide-[var(--border)]">
                 {group.protocols.map((p) => {
                   const compound = COMPOUNDS.find((c) => c.id === p.compoundId);
@@ -765,42 +778,11 @@ function SyringeCards({ due }: { due: Protocol[] }) {
                           <> · <span className="text-foreground font-medium">{vial.reconstitutedBacWaterMl}mL BAC</span></>
                         )}
                       </p>
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {p.timing && (
-                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5">
-                            🕐 {TIMING_LABELS[p.timing] ?? p.timing}
-                          </span>
-                        )}
-                        {compound?.category && (
-                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted)] capitalize">
-                            {compound.category}
-                          </span>
-                        )}
-                        {compound?.charge && (
-                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--muted)] capitalize">
-                            {compound.charge}
-                          </span>
-                        )}
-                        {compound?.fasted && (
-                          <span className="text-[10px] rounded-full bg-[var(--surface-2)] border border-[var(--border)] px-2 py-0.5 text-[var(--warning)]">
-                            Fasted
-                          </span>
-                        )}
-                      </div>
                     </li>
                   );
                 })}
               </ul>
 
-              {/* Draw-in-order helper for multi-compound */}
-              {isMulti && (
-                <p className="px-4 pb-2 text-[11px] text-[var(--muted)]">
-                  Draw in order shown (top → bottom).{" "}
-                  <a href="/more/info" className="text-[var(--accent)]">More…</a>
-                </p>
-              )}
-
-              {/* Footer action */}
               <button
                 onClick={() => {
                   if (isMulti) {
@@ -852,8 +834,6 @@ function SyringeCards({ due }: { due: Protocol[] }) {
           confirmLabel={`Log All ${batchModal.group.protocols.length}`}
           onSubmitOverride={async ({ loggedAt, siteId, notes }) => {
             await logAllInGroup(batchModal.group, loggedAt, siteId, notes);
-          }}
-          onSkipOverride={async () => {
             setBatchModal(null);
           }}
         />

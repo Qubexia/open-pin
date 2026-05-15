@@ -158,7 +158,7 @@ export function LabResultModal({ open, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-2 sm:items-center sm:px-4">
-      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-[var(--border)] bg-[var(--surface)] sm:rounded-2xl">
+      <div className="ui-modal-shell max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl sm:rounded-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
           <button
             type="button"
@@ -172,7 +172,7 @@ export function LabResultModal({ open, onClose }: Props) {
         </div>
 
         <div className="space-y-3 p-4">
-          <div className="grid grid-cols-4 gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-1">
+          <div className="ui-segment grid grid-cols-4 gap-1.5 bg-[var(--surface-2)] p-1">
             {(["manual", "csv", "pdf", "photo"] as const).map((item) => (
               <button
                 key={item}
@@ -196,7 +196,7 @@ export function LabResultModal({ open, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => csvInputRef.current?.click()}
-                className="w-full rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)]"
+                className="ui-button-primary w-full px-3 py-2.5 text-sm font-medium"
               >
                 Choose CSV File
               </button>
@@ -220,7 +220,7 @@ export function LabResultModal({ open, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => (mode === "pdf" ? pdfInputRef.current?.click() : photoInputRef.current?.click())}
-                className="w-full rounded-lg border border-[var(--accent)] bg-[var(--accent)]/10 px-3 py-2.5 text-sm font-medium text-[var(--accent)]"
+                className="ui-button-primary w-full px-3 py-2.5 text-sm font-medium"
               >
                 {mode === "pdf" ? "Choose PDF" : "Take Photo / Upload Image"}
               </button>
@@ -255,7 +255,7 @@ export function LabResultModal({ open, onClose }: Props) {
                 <select
                   value={marker}
                   onChange={(e) => selectPreset(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                  className="ui-input mt-1"
                 >
                   {COMMON_LAB_MARKERS.map((item) => (
                     <option key={item.name} value={item.name}>
@@ -270,7 +270,7 @@ export function LabResultModal({ open, onClose }: Props) {
                   value={customMarker}
                   onChange={(e) => setCustomMarker(e.target.value)}
                   placeholder="Marker name"
-                  className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                  className="ui-input"
                 />
               )}
               <div className="grid grid-cols-2 gap-3">
@@ -281,7 +281,7 @@ export function LabResultModal({ open, onClose }: Props) {
                     inputMode="decimal"
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                    className="ui-input mt-1"
                   />
                 </div>
                 <div>
@@ -289,7 +289,7 @@ export function LabResultModal({ open, onClose }: Props) {
                   <input
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                    className="ui-input mt-1"
                   />
                 </div>
               </div>
@@ -300,7 +300,7 @@ export function LabResultModal({ open, onClose }: Props) {
                     inputMode="decimal"
                     value={refMin}
                     onChange={(e) => setRefMin(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                    className="ui-input mt-1"
                   />
                 </div>
                 <div>
@@ -309,7 +309,7 @@ export function LabResultModal({ open, onClose }: Props) {
                     inputMode="decimal"
                     value={refMax}
                     onChange={(e) => setRefMax(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                    className="ui-input mt-1"
                   />
                 </div>
                 <div>
@@ -333,21 +333,21 @@ export function LabResultModal({ open, onClose }: Props) {
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="mt-1 w-full resize-none rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm"
+                  className="ui-input mt-1 w-full resize-none"
                 />
               </div>
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-fg)] disabled:opacity-50"
+                  className="ui-button-primary flex-1 px-3 py-2 text-sm font-medium disabled:opacity-50"
                 >
                   Save Result
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]"
+                  className="ui-button-secondary px-3 py-2 text-sm text-[var(--muted)]"
                 >
                   Cancel
                 </button>

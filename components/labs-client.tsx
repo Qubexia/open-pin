@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { COMMON_LAB_MARKERS } from "@/data/lab-markers";
-import { useLabs } from "@/lib/stores";
+import { useAppSettings, useLabs } from "@/lib/stores";
+import Link from "next/link";
 
 function statusOf(value: number, refMin?: number, refMax?: number): "low" | "high" | "normal" | "unknown" {
   if (refMin === undefined || refMax === undefined) return "unknown";
@@ -20,6 +21,9 @@ const STATUS_STYLE = {
 
 export function LabsScreen() {
   const { entries, loaded, load, add, remove } = useLabs();
+  const { showLabs, hydrate: hydrateAppSettings } = useAppSettings();
+
+
   const [open, setOpen] = useState(false);
   const [marker, setMarker] = useState(COMMON_LAB_MARKERS[0].name);
   const [customMarker, setCustomMarker] = useState("");
@@ -29,7 +33,10 @@ export function LabsScreen() {
   const [refMax, setRefMax] = useState<string>(String(COMMON_LAB_MARKERS[0].refMax ?? ""));
   const [takenAt, setTakenAt] = useState(() => new Date().toISOString().slice(0, 10));
 
-  useEffect(() => { if (!loaded) load(); }, [loaded, load]);
+  useEffect(() => {
+    if (!loaded) load();
+    hydrateAppSettings();
+  }, [loaded, load, hydrateAppSettings]);
 
   const grouped = useMemo(() => {
     const map: Record<string, typeof entries> = {};
@@ -65,84 +72,102 @@ export function LabsScreen() {
     setOpen(false);
   };
 
+  if (!showLabs) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <div className="text-5xl">🩸</div>
+        <h2 className="text-xl font-semibold">{"Labs Disabled"}</h2>
+        <p className="text-[var(--muted)] max-w-xs">{"You can enable Lab results tracking in the settings panel."}</p>
+        <Link href="/more/settings" className="text-[var(--accent)] font-medium">{"Go to Settings"}</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Labs</h1>
-          <p className="text-sm text-[var(--muted)]">Blood markers & biomarkers</p>
+          <h1 className="text-2xl font-semibold">{"Labs"}</h1>
+          <p className="text-sm text-[var(--muted)]">{"Blood markers & biomarkers"}</p>
         </div>
         <button
           onClick={() => setOpen(true)}
           className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-fg)]"
         >
-          + Add
+          + {"Add"}
         </button>
       </div>
 
       {open && (
         <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-          <p className="text-xs uppercase tracking-wider text-[var(--muted)]">New lab result</p>
+          <p className="text-xs uppercase tracking-wider text-[var(--muted)]">{"New lab result"}</p>
           <div>
-            <label className="text-xs text-[var(--muted)]">Marker</label>
+            <label className="text-xs text-[var(--muted)]">{"Marker"}</label>
             <select value={marker} onChange={(e) => selectPreset(e.target.value)}
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm">
               {COMMON_LAB_MARKERS.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
-              <option value="__custom__">Custom…</option>
+              <option value="__custom__">{"Custom…"}</option>
             </select>
           </div>
           {marker === "__custom__" && (
             <input value={customMarker} onChange={(e) => setCustomMarker(e.target.value)}
-              placeholder="Marker name" className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
+              placeholder={"Marker name"} className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-[var(--muted)]">Value</label>
+              <label className="text-xs text-[var(--muted)]">{"Value"}</label>
               <input required inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)}
                 className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="text-xs text-[var(--muted)]">Unit</label>
+              <label className="text-xs text-[var(--muted)]">{"Unit"}</label>
               <input value={unit} onChange={(e) => setUnit(e.target.value)}
                 className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-[var(--muted)]">Ref min</label>
+              <label className="text-xs text-[var(--muted)]">{"Ref min"}</label>
               <input inputMode="decimal" value={refMin} onChange={(e) => setRefMin(e.target.value)}
                 className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="text-xs text-[var(--muted)]">Ref max</label>
+              <label className="text-xs text-[var(--muted)]">{"Ref max"}</label>
               <input inputMode="decimal" value={refMax} onChange={(e) => setRefMax(e.target.value)}
                 className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
             </div>
             <div>
-              <label className="text-xs text-[var(--muted)]">Date</label>
+              <label className="text-xs text-[var(--muted)]">{"Date"}</label>
               <input type="date" value={takenAt} onChange={(e) => setTakenAt(e.target.value)}
                 className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" />
             </div>
           </div>
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-fg)]">Save</button>
-            <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">Cancel</button>
+            <button type="submit" className="flex-1 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-fg)]">{"Save"}</button>
+            <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">{"Cancel"}</button>
           </div>
         </form>
       )}
 
       {!loaded ? (
-        <p className="text-sm text-[var(--muted)]">Loading…</p>
+        <p className="text-sm text-[var(--muted)]">{"Loading…"}</p>
       ) : Object.keys(grouped).length === 0 ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
-          <p className="text-sm text-[var(--muted)]">No lab results yet.</p>
-          <p className="text-xs text-[var(--muted)] mt-1">Add your first result to start tracking trends.</p>
+          <p className="text-sm text-[var(--muted)]">{"No lab results yet."}</p>
+          <p className="text-xs text-[var(--muted)] mt-1">{"Add your first result to start tracking trends."}</p>
         </div>
       ) : (
         <div className="space-y-3">
           {Object.entries(grouped).map(([name, history]) => {
             const latest = history[0];
             const status = statusOf(latest.value, latest.refMin, latest.refMax);
+            const statusLabel = {
+              low: "Low",
+              high: "High",
+              normal: "Normal",
+              unknown: "Unknown",
+            }[status];
+
             return (
               <div key={name} className={`rounded-xl border bg-[var(--surface)] p-4 ${STATUS_STYLE[status]}`}>
                 <div className="flex items-start justify-between">
@@ -150,7 +175,7 @@ export function LabsScreen() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium">{name}</p>
                       <span className={`text-[10px] uppercase tracking-wider rounded px-1.5 py-0.5 border ${STATUS_STYLE[status]}`}>
-                        {status}
+                        {statusLabel}
                       </span>
                     </div>
                     <p className="text-2xl font-semibold mt-1">
@@ -158,11 +183,11 @@ export function LabsScreen() {
                     </p>
                     {latest.refMin !== undefined && latest.refMax !== undefined && (
                       <p className="text-xs text-[var(--muted)]">
-                        Ref: {latest.refMin}–{latest.refMax} {latest.unit}
+                        {"Ref"}: {latest.refMin}–{latest.refMax} {latest.unit}
                       </p>
                     )}
                     <p className="text-xs text-[var(--muted)] mt-1">
-                      {new Date(latest.takenAt).toLocaleDateString()} · {history.length} reading{history.length !== 1 ? "s" : ""}
+                      {new Date(latest.takenAt).toLocaleDateString()} · {history.length} {"reading"}{history.length !== 1 ? "s" : ""}
                     </p>
                   </div>
                   <button
@@ -175,7 +200,7 @@ export function LabsScreen() {
 
                 {history.length > 1 && (
                   <div className="mt-3 space-y-1">
-                    <p className="text-xs text-[var(--muted)] uppercase tracking-wider">History</p>
+                    <p className="text-xs text-[var(--muted)] uppercase tracking-wider">{"History"}</p>
                     {history.slice(0, 4).map((h) => {
                       const s = statusOf(h.value, h.refMin, h.refMax);
                       return (

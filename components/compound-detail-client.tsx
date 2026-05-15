@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { type Compound, COMPOUNDS, getCompoundName, SAFETY_FLAG_LABELS } from "@/data/compounds";
 import { lookupCompat } from "@/data/interactions";
-import { useDoses, useInventory, useProtocols } from "@/lib/stores";
+import { useAppSettings, useDoses, useInventory, useProtocols } from "@/lib/stores";
 import { FREQ_LABELS, daysRemaining, effectiveDose, totalDuration } from "@/lib/protocol-utils";
 import { cumulativeOrganLoad, organLoadEntries, loadColor } from "@/lib/organ-load";
 
@@ -15,12 +15,15 @@ export function CompoundDetailClient({ compound }: { compound: Compound }) {
   const { vials, loaded: vLoaded, load: loadV } = useInventory();
   const { protocols, loaded: pLoaded, load: loadP } = useProtocols();
   const { doses, loaded: dLoaded, load: loadD } = useDoses();
+  const { hydrate: hydrateAppSettings } = useAppSettings();
+
 
   useEffect(() => {
     if (!vLoaded) loadV();
     if (!pLoaded) loadP();
     if (!dLoaded) loadD();
-  }, [vLoaded, loadV, pLoaded, loadP, dLoaded, loadD]);
+    hydrateAppSettings();
+  }, [vLoaded, loadV, pLoaded, loadP, dLoaded, loadD, hydrateAppSettings]);
 
   const linkedVials = vials.filter((v) => v.compoundId === compound.id);
   const linkedProtocols = protocols.filter((p) => p.compoundId === compound.id);
@@ -68,7 +71,7 @@ export function CompoundDetailClient({ compound }: { compound: Compound }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Link href="/more/library" className="text-xs rounded-md border border-[var(--border)] px-3 py-1.5 text-[var(--muted)]">
-          ← Library
+          {"← Library"}
         </Link>
         <span className="text-xs text-[var(--muted)] uppercase tracking-wider">{compound.id}</span>
       </div>
@@ -77,40 +80,40 @@ export function CompoundDetailClient({ compound }: { compound: Compound }) {
       <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
         <h1 className="text-2xl font-semibold tracking-tight">{compound.name}</h1>
         {compound.aliases?.length ? (
-          <p className="text-xs text-[var(--muted)] mt-0.5">Also: {compound.aliases.join(", ")}</p>
+          <p className="text-xs text-[var(--muted)] mt-0.5">{"Also"}: {compound.aliases.join(", ")}</p>
         ) : null}
         <div className="flex flex-wrap gap-1.5 mt-2">
           <Pill label={compound.category} variant="accent" />
           <Pill label={compound.route ?? "subq"} />
-          {compound.isBlend && <Pill label="Blend" variant="accent" />}
-          {compound.isSupplement && <Pill label="Supplement" />}
-          {compound.pinAlone && <Pill label="Pin alone" variant="warning" />}
-          {compound.fasted && <Pill label="Fasted" />}
+          {compound.isBlend && <Pill label={"Blend"} variant="accent" />}
+          {compound.isSupplement && <Pill label={"Supplement"} />}
+          {compound.pinAlone && <Pill label={"Pin alone"} variant="warning" />}
+          {compound.fasted && <Pill label={"Fasted"} />}
         </div>
       </div>
 
       {/* Adjust Stock gauge */}
       {linkedVials.length > 0 && (
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-          <p className="text-xs uppercase tracking-wider text-[var(--muted)] mb-2">Adjust Stock</p>
+          <p className="text-xs uppercase tracking-wider text-[var(--muted)] mb-2">{"Adjust Stock"}</p>
           <StockGauge totalMg={remainingMg} usedDoses={totalDosesUsed} />
           <div className="grid grid-cols-3 gap-2 mt-3">
-            <Stat label="Vials" value={String(linkedVials.length)} />
-            <Stat label="Total mg" value={remainingMg.toString()} />
-            <Stat label="Doses logged" value={String(totalDosesUsed)} />
+            <Stat label={"Vials"} value={String(linkedVials.length)} />
+            <Stat label={"Total mg"} value={remainingMg.toString()} />
+            <Stat label={"Doses logged"} value={String(totalDosesUsed)} />
           </div>
         </section>
       )}
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-0.5">
-        {(["details", "dosing", "schedule", "interactions"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
+        {(["details", "dosing", "schedule", "interactions"] as const).map((t_id) => (
+          <button key={t_id} onClick={() => setTab(t_id)}
             className={`flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition-colors ${
-              tab === t ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]"
+              tab === t_id ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]"
             }`}
           >
-            {t}
+            {t_id === "details" ? "Details" : t_id === "dosing" ? "Dosing" : t_id === "schedule" ? "Schedule" : "Interactions"}
           </button>
         ))}
       </div>
@@ -363,7 +366,7 @@ function StockGauge({ totalMg, usedDoses }: { totalMg: number; usedDoses: number
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-2xl font-semibold" style={{ color }}>{remainingDoses}</span>
-          <span className="text-[10px] text-[var(--muted)] uppercase tracking-wider">doses left</span>
+          <span className="text-[10px] text-[var(--muted)] uppercase tracking-wider">{"doses left"}</span>
         </div>
       </div>
     </div>

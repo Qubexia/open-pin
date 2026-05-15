@@ -11,6 +11,12 @@
   --muted: #a3a3a3;
   --danger: #ef4444;
   --warning: #f59e0b;
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+  --page-gap: 1rem;
+  --section-gap: 0.75rem;
+  --motion-fast: 160ms;
+  --motion-normal: 220ms;
 }
 
 :root[data-theme='light'], .light {
@@ -24,6 +30,33 @@
   --muted: #737373;
   --danger: #dc2626;
   --warning: #d97706;
+}
+
+:root[data-accent='blue'] {
+  --accent: #38bdf8;
+  --accent-fg: #082f49;
+}
+
+:root[data-accent='amber'] {
+  --accent: #f59e0b;
+  --accent-fg: #451a03;
+}
+
+:root[data-accent='rose'] {
+  --accent: #f43f5e;
+  --accent-fg: #4c0519;
+}
+
+:root[data-density='compact'] {
+  --radius-card: 0.875rem;
+  --radius-control: 0.625rem;
+  --page-gap: 0.75rem;
+  --section-gap: 0.625rem;
+}
+
+:root[data-motion='reduced'] {
+  --motion-fast: 1ms;
+  --motion-normal: 1ms;
 }
 
 @theme inline {
@@ -48,4 +81,90 @@ body {
   color: var(--foreground);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+}
+
+main {
+  gap: var(--page-gap);
+}
+
+.ui-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+}
+
+.ui-card-muted {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-card);
+}
+
+.ui-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-control);
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  transition: border-color var(--motion-fast) ease, background-color var(--motion-fast) ease;
+}
+
+.ui-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.ui-button-primary,
+.ui-button-secondary,
+.ui-button-ghost {
+  border-radius: var(--radius-control);
+  transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease, transform var(--motion-fast) ease;
+}
+
+.ui-button-primary {
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.ui-button-primary:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.ui-button-secondary {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.ui-button-secondary:hover {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+}
+
+.ui-button-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.ui-segment {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: calc(var(--radius-control) + 0.125rem);
+  padding: 0.2rem;
+}
+
+.ui-segment button {
+  border-radius: calc(var(--radius-control) - 0.1rem);
+  transition: background-color var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.ui-modal-shell {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: calc(var(--radius-card) + 0.25rem);
+}
+
+.ui-disclaimer {
+  color: var(--muted);
 }

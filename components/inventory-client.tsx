@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { COMPOUNDS, getCompoundName, type Compound } from "@/data/compounds";
-import { useDoses, useInventory, useOrals, useProtocols } from "@/lib/stores";
+import { useAppSettings, useDoses, useInventory, useOrals, useProtocols } from "@/lib/stores";
 
 type Filter = "all" | "compound" | "supplement";
 type Period = "today" | "week" | "month" | "active";
@@ -347,13 +347,16 @@ export function InventoryScreen() {
   const { orals, loaded: oLoaded, load: loadO } = useOrals();
   const { doses, loaded: dLoaded, load: loadD } = useDoses();
   const { protocols, loaded: pLoaded, load: loadP } = useProtocols();
+  const { showInventory, hydrate: hydrateAppSettings } = useAppSettings();
+
 
   useEffect(() => {
     if (!vLoaded) loadV();
     if (!oLoaded) loadO();
     if (!dLoaded) loadD();
     if (!pLoaded) loadP();
-  }, [vLoaded, loadV, oLoaded, loadO, dLoaded, loadD, pLoaded, loadP]);
+    hydrateAppSettings();
+  }, [vLoaded, loadV, oLoaded, loadO, dLoaded, loadD, pLoaded, loadP, hydrateAppSettings]);
 
   // Counters
   const counts = useMemo(() => {
@@ -366,15 +369,26 @@ export function InventoryScreen() {
     return { today: todayCount, week: weekCount, month: monthCount, active: activeCount };
   }, [doses, protocols]);
 
+  if (!showInventory) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <div className="text-5xl">📦</div>
+        <h2 className="text-xl font-semibold">{"Inventory Disabled"}</h2>
+        <p className="text-[var(--muted)] max-w-xs">{"You can enable Inventory in the settings panel to track your vials and supplements."}</p>
+        <Link href="/more/settings" className="text-[var(--accent)] font-medium">{"Go to Settings"}</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Inventory</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{"Inventory"}</h1>
 
       {/* All/Compound/Supplement filter pills */}
       <div className="flex justify-center gap-2">
         {(["all", "compound", "supplement"] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-xs font-medium border ${
+            className={`rounded-full px-4 py-1.5 text-xs font-medium border transition-colors ${
               filter === f
                 ? "bg-[var(--accent)] text-[var(--accent-fg)] border-[var(--accent)]"
                 : "border-[var(--border)] text-[var(--muted)]"
@@ -402,12 +416,9 @@ export function InventoryScreen() {
       {/* Search */}
       <div className="relative">
         <input value={query} onChange={(e) => setQuery(e.target.value)}
-          placeholder={`Search ${vials.length + orals.length} item${vials.length + orals.length !== 1 ? "s" : ""}…`}
+          placeholder={`Search ${vials.length + orals.length} items…`}
           className="w-full rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-9 py-2 text-sm" />
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm">🔍</span>
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] text-xs">
-          {(filter === "all" ? vials.length + orals.length : filter === "compound" ? vials.length : orals.length)} in / 0 out
-        </span>
       </div>
 
       {/* Sub-tabs */}
