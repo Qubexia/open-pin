@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/db";
+import { HouseholdSettings } from "@/components/household-settings";
 import {
   type AccentPreset,
   type LandingPage,
@@ -98,6 +99,8 @@ export function SettingsScreen() {
     showProtocols,
     showLabs,
     showCalc,
+    householdMode,
+    householdMembers,
     hydrate,
     update,
     reset,
@@ -263,6 +266,15 @@ export function SettingsScreen() {
           <FeatureToggle label="Lab Results" active={showLabs} onToggle={(v) => update({ showLabs: v })} />
           <FeatureToggle label="Calculators" active={showCalc} onToggle={(v) => update({ showCalc: v })} />
         </div>
+      </section>
+
+      <section className="ui-card space-y-4 p-4">
+        <HouseholdSettings
+          enabled={householdMode}
+          members={householdMembers}
+          onToggle={(value) => update({ householdMode: value })}
+          onMembersChange={(members) => update({ householdMembers: members })}
+        />
       </section>
 
       <section className="ui-card space-y-4 p-4">

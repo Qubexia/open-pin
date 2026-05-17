@@ -188,6 +188,16 @@ export type DensityMode = "comfortable" | "compact";
 export type MotionMode = "full" | "reduced";
 export type LandingPage = "/home" | "/protocols" | "/inventory" | "/calc" | "/more";
 export type UnitSystem = "metric" | "imperial";
+export type HouseholdGender = "male" | "female";
+
+export type HouseholdMember = {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  gender: HouseholdGender;
+  primary: boolean;
+};
 
 export type AppSettings = {
   theme: Theme;
@@ -202,9 +212,20 @@ export type AppSettings = {
   showProtocols: boolean;
   showLabs: boolean;
   showCalc: boolean;
+  householdMode: boolean;
+  householdMembers: HouseholdMember[];
 };
 
 const APP_SETTINGS_KEY = "onepin_ui_settings";
+
+const DEFAULT_HOUSEHOLD_MEMBER: HouseholdMember = {
+  id: "primary",
+  name: "Me",
+  initials: "M",
+  color: "#22c55e",
+  gender: "male",
+  primary: true,
+};
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
   theme: "dark",
@@ -219,6 +240,8 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   showProtocols: true,
   showLabs: true,
   showCalc: true,
+  householdMode: false,
+  householdMembers: [DEFAULT_HOUSEHOLD_MEMBER],
 };
 
 function loadAppSettings(): AppSettings {
@@ -274,6 +297,8 @@ export const useAppSettings = create<AppSettingsState>((set, get) => ({
       showProtocols: next.showProtocols,
       showLabs: next.showLabs,
       showCalc: next.showCalc,
+      householdMode: next.householdMode,
+      householdMembers: next.householdMembers,
     };
     localStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(settings));
     localStorage.setItem("onepin_theme", settings.theme);
