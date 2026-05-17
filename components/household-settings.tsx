@@ -44,6 +44,7 @@ export function HouseholdSettings({
 }: HouseholdSettingsProps) {
   const [editingMember, setEditingMember] = useState<HouseholdMember | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [memberPendingDelete, setMemberPendingDelete] = useState<HouseholdMember | null>(null);
 
   const closeModal = () => {
     setEditingMember(null);
@@ -79,6 +80,17 @@ export function HouseholdSettings({
     };
     onMembersChange([...members, nextMember]);
     closeModal();
+  };
+
+  const handleDeleteMember = (member: HouseholdMember) => {
+    if (member.primary) return;
+    setMemberPendingDelete(member);
+  };
+
+  const confirmDeleteMember = () => {
+    if (!memberPendingDelete) return;
+    onMembersChange(members.filter((entry) => entry.id !== memberPendingDelete.id));
+    setMemberPendingDelete(null);
   };
 
   return (
@@ -141,39 +153,53 @@ export function HouseholdSettings({
 
           <div className="ui-card space-y-4 p-4 sm:p-5">
             <div className="space-y-3">
-              {members.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between gap-3 rounded-[calc(var(--radius-card)-0.2rem)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-semibold text-white"
-                      style={{ backgroundColor: member.color }}
-                    >
-                      {member.initials}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-base font-semibold">{member.name}</p>
-                        {member.primary && (
-                          <span className="rounded-full bg-[var(--accent)]/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
-                            Primary
-                          </span>
-                        )}
+              {members.map((member, index) => (
+                <div key={member.id} className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 rounded-[calc(var(--radius-card)-0.2rem)] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-semibold text-white"
+                        style={{ backgroundColor: member.color }}
+                      >
+                        {member.initials}
                       </div>
-                      <p className="text-xs text-[var(--muted)]">
-                        {member.color} · {member.gender === "male" ? "Male body map" : "Female body map"}
-                      </p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-base font-semibold">{member.name}</p>
+                          {member.primary && (
+                            <span className="rounded-full bg-[var(--accent)]/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+                              Primary
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[var(--muted)]">
+                          {member.color} · {member.gender === "male" ? "Male body map" : "Female body map"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingMember(member)}
+                        className="ui-button-primary px-3 py-2 text-sm font-medium"
+                      >
+                        Edit
+                      </button>
+                      {!member.primary && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMember(member)}
+                          className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-control)] border border-[var(--danger)]/45 bg-[var(--danger)]/8 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/14"
+                          aria-label={`Delete ${member.name}`}
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingMember(member)}
-                    className="ui-button-primary px-3 py-2 text-sm font-medium"
-                  >
-                    Edit
-                  </button>
+
+                  {index < members.length - 1 && <div className="h-px bg-[var(--border)]/90" />}
                 </div>
               ))}
             </div>
@@ -201,6 +227,14 @@ export function HouseholdSettings({
           initialMember={editingMember}
           onClose={closeModal}
           onSave={handleSaveMember}
+        />
+      )}
+
+      {memberPendingDelete && (
+        <ConfirmDeleteModal
+          member={memberPendingDelete}
+          onCancel={() => setMemberPendingDelete(null)}
+          onConfirm={confirmDeleteMember}
         />
       )}
     </section>
@@ -281,9 +315,7 @@ function PersonEditorModal({
                     style={{ backgroundColor: color }}
                     aria-label={`Select ${color}`}
                   >
-                    {active && (
-                      <span className="absolute inset-[4px] rounded-full border-2 border-white" />
-                    )}
+                    {active && <span className="absolute inset-[4px] rounded-full border-2 border-white" />}
                   </button>
                 );
               })}
@@ -353,5 +385,71 @@ function Field({
       <span className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">{label}</span>
       {children}
     </label>
+  );
+}
+
+function ConfirmDeleteModal({
+  member,
+  onCancel,
+  onConfirm,
+}: {
+  member: HouseholdMember;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-[3px]">
+      <div className="ui-modal-shell w-full max-w-sm overflow-hidden border-[var(--danger)]/35 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--surface)_96%,transparent),color-mix(in_srgb,var(--surface-2)_98%,transparent))] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
+        <div className="border-b border-[var(--border)] px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--danger)]/35 bg-[var(--danger)]/10 text-lg text-[var(--danger)]">
+              !
+            </div>
+            <div>
+              <p className="text-lg font-semibold tracking-tight">Delete Person</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">This action can&apos;t be undone</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          <div className="rounded-[calc(var(--radius-card)-0.2rem)] border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+            <p className="text-sm leading-6 text-[var(--muted)]">
+              Remove <span className="font-semibold text-[var(--foreground)]">{member.name}</span> from this household?
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold text-white"
+              style={{ backgroundColor: member.color }}
+            >
+              {member.initials}
+            </div>
+            <div>
+              <p className="font-medium">{member.name}</p>
+              <p className="text-xs text-[var(--muted)]">{member.gender === "male" ? "Male body map" : "Female body map"}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 border-t border-[var(--border)] px-5 py-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="ui-button-secondary px-3 py-3 text-sm font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-[var(--radius-control)] border border-[var(--danger)]/60 bg-[var(--danger)]/12 px-3 py-3 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[var(--danger)]/16"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
