@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { hashPin } from "@/lib/pin";
 import type { HouseholdGender, HouseholdMember } from "@/lib/stores";
 
 const HOUSEHOLD_COLORS = [
@@ -27,6 +28,8 @@ type MemberDraft = {
   initials: string;
   color: string;
   gender: HouseholdGender;
+  pin: string;
+  confirmPin: string;
 };
 
 const EMPTY_DRAFT: MemberDraft = {
@@ -34,6 +37,8 @@ const EMPTY_DRAFT: MemberDraft = {
   initials: "",
   color: HOUSEHOLD_COLORS[0],
   gender: "male",
+  pin: "",
+  confirmPin: "",
 };
 
 export function HouseholdSettings({
@@ -51,7 +56,13 @@ export function HouseholdSettings({
     setIsAdding(false);
   };
 
-  const handleSaveMember = (draft: MemberDraft) => {
+  const householdPinReady =
+    members.length > 0 &&
+    members.every((member) => member.primary || Boolean(member.pinHash));
+
+  const handleSaveMember = async (draft: MemberDraft) => {
+    const pinHash = draft.pin ? await hashPin(draft.pin) : undefined;
+
     if (editingMember) {
       onMembersChange(
         members.map((member) =>
@@ -62,6 +73,7 @@ export function HouseholdSettings({
                 initials: draft.initials,
                 color: draft.color,
                 gender: draft.gender,
+                pinHash: pinHash ?? member.pinHash,
               }
             : member
         )
@@ -77,6 +89,7 @@ export function HouseholdSettings({
       color: draft.color,
       gender: draft.gender,
       primary: false,
+      pinHash,
     };
     onMembersChange([...members, nextMember]);
     closeModal();
@@ -99,6 +112,15 @@ export function HouseholdSettings({
         <h2 className="text-xs uppercase tracking-[0.28em] text-[var(--muted)]">Household</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">
           Track up to two people in one app while keeping inventory shared.
+        </p>
+      </div>
+
+      <div className="rounded-[calc(var(--radius-card)-0.2rem)] border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+        <p className="text-sm font-medium">
+          {householdPinReady ? "PIN login is active for this household." : "Set a 6-digit PIN for each added person."}
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          The owner has a private fixed code. Every added user gets their own 6-digit PIN, and the login screen appears before the app opens.
         </p>
       </div>
 
@@ -171,6 +193,15 @@ export function HouseholdSettings({
                               Primary
                             </span>
                           )}
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                              member.primary || member.pinHash
+                                ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                                : "bg-[var(--surface)] text-[var(--muted)]"
+                            }`}
+                          >
+                            {member.primary ? "Owner Access" : member.pinHash ? "PIN Set" : "PIN Needed"}
+                          </span>
                         </div>
                         <p className="text-xs text-[var(--muted)]">
                           {member.color} · {member.gender === "male" ? "Male body map" : "Female body map"}
@@ -250,7 +281,7 @@ function PersonEditorModal({
   title: string;
   initialMember: HouseholdMember | null;
   onClose: () => void;
-  onSave: (draft: MemberDraft) => void;
+  onSave: (draft: MemberDraft) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<MemberDraft>(() =>
     initialMember
@@ -259,15 +290,49 @@ function PersonEditorModal({
           initials: initialMember.initials,
           color: initialMember.color,
           gender: initialMember.gender,
+          pin: "",
+          confirmPin: "",
         }
       : { ...EMPTY_DRAFT }
   );
+  const [status, setStatus] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const normalizedInitials = draft.initials
     .replace(/[^a-zA-Z]/g, "")
     .slice(0, 2)
     .toUpperCase();
-  const canSave = draft.name.trim().length > 0 && normalizedInitials.length >= 1;
+  const pinRequired = !initialMember?.pinHash && !initialMember?.primary;
+  const normalizedPin = draft.pin.replace(/\D/g, "").slice(0, 6);
+  const normalizedConfirmPin = draft.confirmPin.replace(/\D/g, "").slice(0, 6);
+  const pinLooksValid = normalizedPin.length === 6;
+  const confirmMatches = normalizedPin === normalizedConfirmPin;
+  const hasPinChange = normalizedPin.length > 0 || normalizedConfirmPin.length > 0;
+  const pinReady = pinRequired ? pinLooksValid && confirmMatches : !hasPinChange || (pinLooksValid && confirmMatches);
+  const canSave = draft.name.trim().length > 0 && normalizedInitials.length >= 1 && pinReady;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    if (pinRequired && normalizedPin.length !== 6) {
+      setStatus("PIN must be exactly 6 digits.");
+      return;
+    }
+    if (hasPinChange && !confirmMatches) {
+      setStatus("PIN confirmation does not match.");
+      return;
+    }
+
+    setSaving(true);
+    setStatus("");
+    await onSave({
+      ...draft,
+      name: draft.name.trim(),
+      initials: normalizedInitials,
+      pin: normalizedPin,
+      confirmPin: normalizedConfirmPin,
+    });
+    setSaving(false);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-[2px]">
@@ -343,6 +408,46 @@ function PersonEditorModal({
               })}
             </div>
           </Field>
+
+          <Field label="6-digit PIN">
+            <input
+              value={draft.pin}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  pin: event.target.value.replace(/\D/g, "").slice(0, 6),
+                }))
+              }
+              inputMode="numeric"
+              placeholder={initialMember?.pinHash ? "Leave blank to keep current PIN" : "Enter 6 digits"}
+              className="ui-input bg-[var(--surface)] tracking-[0.3em]"
+            />
+          </Field>
+
+          <Field label="Confirm PIN">
+            <input
+              value={draft.confirmPin}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  confirmPin: event.target.value.replace(/\D/g, "").slice(0, 6),
+                }))
+              }
+              inputMode="numeric"
+              placeholder={initialMember?.pinHash ? "Repeat new PIN if changing it" : "Repeat the 6 digits"}
+              className="ui-input bg-[var(--surface)] tracking-[0.3em]"
+            />
+          </Field>
+
+          <p className="text-xs text-[var(--muted)]">
+            {initialMember?.primary
+              ? "Primary user signs in with the owner's private fixed code."
+              : initialMember?.pinHash
+              ? "You can leave both PIN fields empty to keep the current code."
+              : "A 6-digit PIN is required before this person can use the login screen."}
+          </p>
+
+          {status && <p className="text-xs text-[var(--danger)]">{status}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-3 border-t border-[var(--border)] px-5 py-4">
@@ -355,17 +460,11 @@ function PersonEditorModal({
           </button>
           <button
             type="button"
-            onClick={() =>
-              onSave({
-                ...draft,
-                name: draft.name.trim(),
-                initials: normalizedInitials,
-              })
-            }
-            disabled={!canSave}
+            onClick={() => void handleSave()}
+            disabled={!canSave || saving}
             className="ui-button-primary px-3 py-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Save
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>

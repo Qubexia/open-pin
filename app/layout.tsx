@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
+import { AppShell } from "@/components/app-shell";
 import "./globals.css";
-import { TabBar } from "@/components/tab-bar";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -25,37 +24,33 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <head>
-        <script dangerouslySetInnerHTML={{
-          __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
             (function() {
               try {
                 const raw = localStorage.getItem('onepin_ui_settings');
                 const settings = raw ? JSON.parse(raw) : {};
                 const theme = settings.theme || localStorage.getItem('onepin_theme') || 'dark';
-                
+
                 document.documentElement.setAttribute('data-theme', theme);
                 document.documentElement.setAttribute('data-accent', settings.accent || 'green');
                 document.documentElement.setAttribute('data-density', settings.density || 'comfortable');
                 document.documentElement.setAttribute('data-motion', settings.motion || 'full');
               } catch (e) {}
             })()
-          `
-        }} />
+          `,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
-        <header className="sticky top-0 z-20 w-full border-b border-[var(--border)] bg-[var(--background)]/90 backdrop-blur"
-          style={{ paddingTop: "env(safe-area-inset-top)" }}>
-          <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-2.5">
-            <Link href="/home" className="text-sm font-semibold tracking-tight">OnePin</Link>
-            <Link href="/more/settings" className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--muted)] hover:text-foreground">
-              ⚙
-            </Link>
-          </div>
-        </header>
-        <main className="flex-1 w-full max-w-2xl mx-auto px-4 pt-4 pb-24">{children}</main>
-        <TabBar />
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

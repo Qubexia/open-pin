@@ -197,6 +197,7 @@ export type HouseholdMember = {
   color: string;
   gender: HouseholdGender;
   primary: boolean;
+  pinHash?: string;
 };
 
 export type AppSettings = {
@@ -217,6 +218,7 @@ export type AppSettings = {
 };
 
 const APP_SETTINGS_KEY = "onepin_ui_settings";
+const HOUSEHOLD_SESSION_KEY = "onepin_household_active_member";
 
 const DEFAULT_HOUSEHOLD_MEMBER: HouseholdMember = {
   id: "primary",
@@ -225,6 +227,7 @@ const DEFAULT_HOUSEHOLD_MEMBER: HouseholdMember = {
   color: "#22c55e",
   gender: "male",
   primary: true,
+  pinHash: undefined,
 };
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -273,6 +276,14 @@ type AppSettingsState = AppSettings & {
   reset: () => void;
 };
 
+type HouseholdSessionState = {
+  loaded: boolean;
+  activeMemberId: string | null;
+  hydrate: (settings: AppSettings) => void;
+  unlock: (memberId: string) => void;
+  lock: () => void;
+};
+
 export const useAppSettings = create<AppSettingsState>((set, get) => ({
   ...DEFAULT_APP_SETTINGS,
   loaded: false,
@@ -310,5 +321,39 @@ export const useAppSettings = create<AppSettingsState>((set, get) => ({
     localStorage.setItem("onepin_theme", DEFAULT_APP_SETTINGS.theme);
     applyAppSettings(DEFAULT_APP_SETTINGS);
     set({ ...DEFAULT_APP_SETTINGS, loaded: true });
+  },
+}));
+
+function householdPinProtected(settings: AppSettings) {
+  return settings.householdMode && settings.householdMembers.length > 0;
+}
+
+export const useHouseholdSession = create<HouseholdSessionState>((set) => ({
+  loaded: false,
+  activeMemberId: null,
+  hydrate: (settings) => {
+    if (typeof window === "undefined") return;
+    if (!householdPinProtected(settings)) {
+      sessionStorage.removeItem(HOUSEHOLD_SESSION_KEY);
+      set({ activeMemberId: null, loaded: true });
+      return;
+    }
+
+    const storedId = sessionStorage.getItem(HOUSEHOLD_SESSION_KEY);
+    const validId = settings.householdMembers.some((member) => member.id === storedId) ? storedId : null;
+    if (!validId) {
+      sessionStorage.removeItem(HOUSEHOLD_SESSION_KEY);
+    }
+    set({ activeMemberId: validId, loaded: true });
+  },
+  unlock: (memberId) => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(HOUSEHOLD_SESSION_KEY, memberId);
+    set({ activeMemberId: memberId, loaded: true });
+  },
+  lock: () => {
+    if (typeof window === "undefined") return;
+    sessionStorage.removeItem(HOUSEHOLD_SESSION_KEY);
+    set({ activeMemberId: null, loaded: true });
   },
 }));
